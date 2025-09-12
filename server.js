@@ -157,6 +157,7 @@ app.post('/execute', async (req, res) => {
         let matchedJob = null;
         let matchType = null;
         
+        // 完全一致をチェック
         const exactMatch = jobListings.find(job => 
             job.toLowerCase() === inputJobName.toLowerCase()
         );
@@ -166,15 +167,36 @@ app.post('/execute', async (req, res) => {
             matchType = 'exact';
             sendLog(`完全一致: ${inputJobName} → ${exactMatch}`, 'success');
         } else {
-            const partialMatch = jobListings.find(job => 
-                job.toLowerCase().includes(inputJobName.toLowerCase()) ||
-                inputJobName.toLowerCase().includes(job.toLowerCase())
-            );
+            // 部分一致をチェック（双方向）
+            const partialMatch = jobListings.find(job => {
+                const jobLower = job.toLowerCase();
+                const inputLower = inputJobName.toLowerCase();
+                
+                // 募集職種名に入力文字が含まれる（例: 「インサイドセ」→「インサイドセールス」）
+                if (jobLower.includes(inputLower)) {
+                    return true;
+                }
+                
+                // 入力文字に募集職種名が含まれる（例: 「マネジャー候補インサイドセールス」→「インサイドセールス」）
+                if (inputLower.includes(jobLower)) {
+                    return true;
+                }
+                
+                return false;
+            });
             
             if (partialMatch) {
                 matchedJob = partialMatch;
                 matchType = 'partial';
-                sendLog(`部分一致: ${inputJobName} → ${partialMatch}`, 'success');
+                
+                const jobLower = partialMatch.toLowerCase();
+                const inputLower = inputJobName.toLowerCase();
+                
+                if (jobLower.includes(inputLower)) {
+                    sendLog(`部分一致: 「${inputJobName}」が「${partialMatch}」に含まれています`, 'success');
+                } else if (inputLower.includes(jobLower)) {
+                    sendLog(`部分一致: 「${partialMatch}」が「${inputJobName}」に含まれています`, 'success');
+                }
             } else {
                 matchType = 'none';
                 sendLog(`該当なし: ${inputJobName}に一致する募集職種が見つかりませんでした`, 'error');

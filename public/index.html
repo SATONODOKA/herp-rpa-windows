@@ -273,18 +273,42 @@
             inputJobDiv.innerHTML = `<div class="result-item">${result.inputJobName}</div>`;
             
             if (result.matchType === 'exact') {
-                matchResultDiv.innerHTML = `<div class="result-item exact-match">完全一致: ${result.matchedJob}</div>`;
+                matchResultDiv.innerHTML = `
+                    <div class="result-item exact-match">
+                        <strong>完全一致</strong><br>
+                        募集職種: ${result.matchedJob}
+                    </div>`;
             } else if (result.matchType === 'partial') {
-                matchResultDiv.innerHTML = `<div class="result-item partial-match">部分一致: ${result.matchedJob}</div>`;
+                matchResultDiv.innerHTML = `
+                    <div class="result-item partial-match">
+                        <strong>部分一致</strong><br>
+                        募集職種: ${result.matchedJob}<br>
+                        <small style="color: #666;">
+                            「${result.inputJobName}」が「${result.matchedJob}」に含まれています
+                        </small>
+                    </div>`;
             } else {
-                matchResultDiv.innerHTML = `<div class="result-item no-match">該当なし</div>`;
+                matchResultDiv.innerHTML = `
+                    <div class="result-item no-match">
+                        <strong>該当なし</strong><br>
+                        <small style="color: #999;">
+                            「${result.inputJobName}」に一致する募集職種が見つかりませんでした
+                        </small>
+                    </div>`;
             }
             
             if (result.availableJobs && result.availableJobs.length > 0) {
-                result.availableJobs.forEach(job => {
+                const availableTitle = document.createElement('div');
+                availableTitle.innerHTML = '<strong style="color: #333;">現在の募集職種:</strong>';
+                availableJobsDiv.appendChild(availableTitle);
+                
+                result.availableJobs.forEach((job, index) => {
                     const item = document.createElement('div');
                     item.className = 'result-item';
-                    item.textContent = job;
+                    item.style.borderLeft = '3px solid #ddd';
+                    item.style.paddingLeft = '8px';
+                    item.style.marginTop = '5px';
+                    item.innerHTML = `${index + 1}. ${job}`;
                     availableJobsDiv.appendChild(item);
                 });
             }
