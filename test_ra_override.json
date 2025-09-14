@@ -1,0 +1,17 @@
+{
+  "recommendation_no_raw": "20250914-PM002",
+  "kintone": {
+    "record_id": "12345",
+    "app_id": "67890"
+  },
+  "calib": {
+    "record": {
+      "ra_memo_raw": "W送付プロジェクトマネージャー※現年収:800万円、希望年収:900万円、最低希望年収:850万円",
+      "ra_comment": "履歴書,職務経歴書を必須にしてください。経歴も重要なので必須でお願いします。",
+      "pdf_export": {
+        "status": "completed",
+        "file_path": "/exports/candidate_20250914_002.pdf"
+      }
+    }
+  }
+} 

@@ -643,6 +643,23 @@
             }
             formHtml += '</div>';
             
+            // 追加必須項目オーバーライド情報の表示
+            if (formAnalysis.additionalRequiredOverrides && formAnalysis.additionalRequiredOverrides.specifiedFields.length > 0) {
+                formHtml += '<div class="result-item" style="background-color: #fff3e0; border-left-color: #ff9800;">';
+                formHtml += '<strong>🔧 追加必須項目による上書き</strong><br>';
+                formHtml += `<strong>指定された項目:</strong> ${formAnalysis.additionalRequiredOverrides.specifiedFields.join(', ')}<br>`;
+                formHtml += `<strong>適用件数:</strong> ${formAnalysis.additionalRequiredOverrides.appliedCount}件<br>`;
+                
+                if (formAnalysis.additionalRequiredOverrides.appliedFields && formAnalysis.additionalRequiredOverrides.appliedFields.length > 0) {
+                    formHtml += '<strong>適用結果:</strong><br>';
+                    formAnalysis.additionalRequiredOverrides.appliedFields.forEach(applied => {
+                        formHtml += `&nbsp;&nbsp;• 「${applied.fieldName}」→ 必須に変更（指定: ${applied.overriddenBy}）<br>`;
+                    });
+                }
+                
+                formHtml += '</div>';
+            }
+            
             // 有効フィールドのみで統計を計算
             const validFields = formAnalysis.fields ? formAnalysis.fields.filter(field => 
                 field.name !== 'Unknown Field' && field.name.trim() !== ''

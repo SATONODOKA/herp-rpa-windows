@@ -52,7 +52,8 @@ function extractJobNameFromComplexFormat(data) {
         method: null,
         warnings: [],
         errors: [],
-        originalData: null
+        originalData: null,
+        additionalRequiredFields: [] // 追加必須項目
     };
 
     try {
@@ -70,6 +71,19 @@ function extractJobNameFromComplexFormat(data) {
         if (data.calib && data.calib.record && data.calib.record.ra_memo_raw) {
             const raMemoRaw = data.calib.record.ra_memo_raw;
             extractionResult.originalData = raMemoRaw;
+            
+            // 追加必須項目を抽出（既存機能に追加）
+            if (data.kintone && data.kintone.record) {
+                const atsInputType = data.kintone.record.ats_input_type_1_raw;
+                const additionalFields = data.kintone.record.additional_required_fields_raw;
+                
+                if (atsInputType && atsInputType.includes('追加指定項目あり') && additionalFields) {
+                    extractionResult.additionalRequiredFields = Array.isArray(additionalFields) ? additionalFields : [];
+                    if (extractionResult.additionalRequiredFields.length > 0) {
+                        extractionResult.warnings.push(`追加必須項目が指定されています: ${extractionResult.additionalRequiredFields.join(', ')}`);
+                    }
+                }
+            }
             
             // パターン: "W送付" + 求人名 + "※"
             const pattern = /W送付\s*(.+?)\s*※/;
@@ -563,7 +577,7 @@ async function clickRecommendationButton(page, targetJobName) {
 }
 
 // 推薦ページのフォーム項目を解析する関数
-async function analyzeRecommendationForm(page, jobName) {
+async function analyzeRecommendationForm(page, jobName, additionalRequiredFields = []) {
     const analysisResult = {
         success: false,
         error: null,
@@ -574,7 +588,12 @@ async function analyzeRecommendationForm(page, jobName) {
         optionalFields: 0,
         fields: [],
         pageUrl: null,
-        companyName: null
+        companyName: null,
+        additionalRequiredOverrides: {
+            specifiedFields: additionalRequiredFields || [],
+            appliedCount: 0,
+            appliedFields: []
+        }
     };
 
     try {
@@ -782,9 +801,38 @@ async function analyzeRecommendationForm(page, jobName) {
 
         analysisResult.fields = formData.fields;
         analysisResult.companyName = formData.companyName;
-        analysisResult.totalFields = formData.fields.length;
-        analysisResult.requiredFields = formData.fields.filter(f => f.required).length;
-        analysisResult.optionalFields = formData.fields.filter(f => !f.required).length;
+        
+        // 追加必須項目の適用（既存機能の後に実行）
+        if (additionalRequiredFields && additionalRequiredFields.length > 0) {
+            additionalRequiredFields.forEach(requiredField => {
+                const matches = analysisResult.fields.filter(field => {
+                    const fieldName = field.name.toLowerCase();
+                    const requiredName = requiredField.toLowerCase();
+                    
+                    // 完全一致または部分一致
+                    return fieldName === requiredName || 
+                           fieldName.includes(requiredName) || 
+                           requiredName.includes(fieldName);
+                });
+                
+                matches.forEach(field => {
+                    if (!field.required) {
+                        field.required = true;
+                        field.detectionMethod += ' + additional-required';
+                        analysisResult.additionalRequiredOverrides.appliedCount++;
+                        analysisResult.additionalRequiredOverrides.appliedFields.push({
+                            fieldName: field.name,
+                            originalRequired: false,
+                            overriddenBy: requiredField
+                        });
+                    }
+                });
+            });
+        }
+        
+        analysisResult.totalFields = analysisResult.fields.length;
+        analysisResult.requiredFields = analysisResult.fields.filter(f => f.required).length;
+        analysisResult.optionalFields = analysisResult.fields.filter(f => !f.required).length;
 
         if (analysisResult.totalFields > 0) {
             analysisResult.success = true;
@@ -1069,7 +1117,7 @@ app.post('/execute', async (req, res) => {
             // ページ遷移を待機
             await new Promise(resolve => setTimeout(resolve, 3000));
             
-            formAnalysisResult = await analyzeRecommendationForm(page, matchResult.matchedJob);
+            formAnalysisResult = await analyzeRecommendationForm(page, matchResult.matchedJob, extractionResult.additionalRequiredFields);
             
             if (formAnalysisResult.success) {
                 sendLog(`フォーム解析完了: ${formAnalysisResult.totalFields}個の項目を検出`, 'success');

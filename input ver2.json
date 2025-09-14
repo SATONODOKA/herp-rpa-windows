@@ -1,0 +1,35 @@
+{
+  "recommendation_no_raw": "20250911-XYZ2",
+  "kintone": {
+    "source": "kintone",
+    "fetched_at": "2025-09-11T13:00:00+09:00",
+    "record": {
+      "ats_type_1_raw": "ジョブカン",
+      "browser_name_1_raw": "不明",
+      "company_name_raw": "サンフロンティア不動産(株)",
+      "ats_url_1_raw": "https://ats.jobcan.jp/agents/sign_in",
+      "ats_id_1_raw": "mst-endo@r-agent.com",
+      "ats_pw_1_raw": "Yuan0412",
+      "notes_1_raw": null,
+      "ats_input_type_1_raw": "追加指定項目あり＋PDF",
+      "ats_input_language_1_raw": "すべて日本語",
+      "pdf_processing_required_raw": null,
+      "additional_required_fields_raw": [
+        "氏名（漢字）",
+        "氏名（フリガナ/ふりがな）",
+        "メールアドレス"
+      ]
+    }
+  },
+  "calib": {
+    "source": "calib",
+    "fetched_at": "2025-09-11T13:00:00+09:00",
+    "record": {
+      "ra_memo_raw": "W送付　【DS】データサイエンティスト（DX支援・組織開発）【正社員】 ※現年収:780万円、希望年収:750万円、最低希望年収:750万円",
+      "pdf_export": {
+        "performed_raw": true,
+        "file_path": "/downloads/calib/20250911-XYZ2.pdf"
+      }
+    }
+  }
+}
