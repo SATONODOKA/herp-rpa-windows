@@ -1303,6 +1303,67 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
         if (pdfResult.recommendationComment) extractedItems.push(`推薦コメント「${pdfResult.recommendationComment.substring(0, 30)}...」`);
         if (pdfResult.careerSummary) extractedItems.push(`職務要約「${pdfResult.careerSummary.substring(0, 30)}...」`);
         
+        // 学歴・職歴詳細データの出力
+        if (pdfResult.educationDetails) {
+            const eduDetails = pdfResult.educationDetails;
+            console.log('\n📚 === 学歴詳細データ ===');
+            console.log(`📊 学歴エントリ数: ${eduDetails.educationEntries.length}`);
+            eduDetails.educationEntries.forEach((entry, index) => {
+                console.log(`  ${index + 1}. ${entry.year}年${entry.month}月: ${entry.content}`);
+            });
+            console.log(`📚 学歴関連行数: ${eduDetails.rawEducationSection.length}`);
+            eduDetails.rawEducationSection.forEach((line, index) => {
+                console.log(`  [${index + 1}] ${line}`);
+            });
+            
+            console.log('\n💼 === 職歴詳細データ ===');
+            console.log(`📊 職歴エントリ数: ${eduDetails.careerEntries.length}`);
+            eduDetails.careerEntries.forEach((entry, index) => {
+                console.log(`  ${index + 1}. ${entry.year}年${entry.month}月: ${entry.content}`);
+            });
+            console.log(`💼 職歴関連行数: ${eduDetails.rawCareerSection.length}`);
+            eduDetails.rawCareerSection.forEach((line, index) => {
+                console.log(`  [${index + 1}] ${line}`);
+            });
+            console.log('=========================');
+        }
+
+        // PDF解析結果の詳細チェック
+        console.log('\n🔍 === PDF解析結果詳細チェック ===');
+        console.log(`📦 pdfResult構造:`, Object.keys(pdfResult || {}));
+        console.log(`🏢 currentCompany存在: ${!!pdfResult.currentCompany}`);
+        console.log(`🎓 finalEducation存在: ${!!pdfResult.finalEducation}`);
+        if (pdfResult.currentCompany) {
+            console.log(`  🏢 currentCompany内容:`, pdfResult.currentCompany);
+        }
+        if (pdfResult.finalEducation) {
+            console.log(`  🎓 finalEducation内容:`, pdfResult.finalEducation);
+        }
+        console.log('🔍 === PDF解析結果詳細チェック完了 ===\n');
+
+        // 現所属・最終学歴の抽出結果
+        if (pdfResult.currentCompany) {
+            console.log('\n🏢 === 現所属抽出結果 ===');
+            if (pdfResult.currentCompany.company) {
+                console.log(`✅ 現所属: "${pdfResult.currentCompany.company}"`);
+                console.log(`📅 入社年月: ${pdfResult.currentCompany.year}年${pdfResult.currentCompany.month}月`);
+                console.log(`🎯 信頼度: ${pdfResult.currentCompany.confidence}%`);
+            } else {
+                console.log('❌ 現所属の抽出に失敗');
+            }
+        }
+
+        if (pdfResult.finalEducation) {
+            console.log('\n🎓 === 最終学歴抽出結果 ===');
+            if (pdfResult.finalEducation.education) {
+                console.log(`✅ 最終学歴: "${pdfResult.finalEducation.education}"`);
+                console.log(`📅 卒業年月: ${pdfResult.finalEducation.year}年${pdfResult.finalEducation.month}月`);
+                console.log(`🎯 信頼度: ${pdfResult.finalEducation.confidence}%`);
+            } else {
+                console.log('❌ 最終学歴の抽出に失敗');
+            }
+        }
+        
         if (extractedItems.length > 0) {
             sendLog(`PDF解析完了: ${extractedItems.join(', ')}`, 'info');
         } else {
@@ -1376,6 +1437,24 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 mapping.source = '自動ファイル設定（直接マッチ）';
                 mapping.confidence = 100;
                 console.log(`✅ 直接マッチング成功: "${field.name}" → "ー" (ファイルアップロード前提)`);
+            } else if (field.name === '現所属') {
+                if (pdfResult.currentCompany && pdfResult.currentCompany.company) {
+                    mapping.value = pdfResult.currentCompany.company;
+                    mapping.source = '現所属自動抽出';
+                    mapping.confidence = pdfResult.currentCompany.confidence;
+                    console.log(`✅ 現所属マッピング成功: "${field.name}" → "${pdfResult.currentCompany.company}"`);
+                } else {
+                    console.log(`⚠️ 現所属の抽出に失敗: "${field.name}"`);
+                }
+            } else if (field.name === '最終学歴') {
+                if (pdfResult.finalEducation && pdfResult.finalEducation.education) {
+                    mapping.value = pdfResult.finalEducation.education;
+                    mapping.source = '最終学歴自動抽出';
+                    mapping.confidence = pdfResult.finalEducation.confidence;
+                    console.log(`✅ 最終学歴マッピング成功: "${field.name}" → "${pdfResult.finalEducation.education}"`);
+                } else {
+                    console.log(`⚠️ 最終学歴の抽出に失敗: "${field.name}"`);
+                }
             }
             
             // JSONファイルからの設定も確認（フォールバック）
