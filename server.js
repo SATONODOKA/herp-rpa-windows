@@ -1146,9 +1146,18 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
                             isMatch = true;
                         }
                     }
-                    // 3. その他の項目は部分一致
+                    // 3. その他の項目は部分一致（ただし経歴と職務経歴書の混線を防ぐ）
                     else {
-                        isMatch = fieldName.includes(requiredName) || requiredName.includes(fieldName);
+                        // 経歴フィールドの特別処理：職務経歴書への混線を防ぐ
+                        if (requiredName === '経歴' && fieldName === '職務経歴書') {
+                            isMatch = false; // 明示的に除外
+                            console.log(`⏭️ フィールドマッチング除外: "${requiredField}" → "${field.name}" (職務経歴書は除外)`);
+                        } else if (requiredName === '職務経歴書' && fieldName === '経歴') {
+                            isMatch = false; // 逆方向も除外
+                            console.log(`⏭️ フィールドマッチング除外: "${requiredField}" → "${field.name}" (経歴は除外)`);
+                        } else {
+                            isMatch = fieldName.includes(requiredName) || requiredName.includes(fieldName);
+                        }
                     }
                     
                     // デバッグログ
@@ -1413,10 +1422,15 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 mapping.value = pdfResult.recommendationComment;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.recommendationComment ? pdfResult.confidence : 0;
-            } else if (!mapping.value && (field.name.includes('経歴') || field.name.includes('職務') || (field.name.includes('職') && field.name.includes('歴')))) {
+            } else if (!mapping.value && field.name === '経歴') {
+                // 「経歴」フィールドのみにPDF解析結果をマッピング（職務経歴書は除外）
                 mapping.value = pdfResult.careerSummary;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.careerSummary ? pdfResult.confidence : 0;
+                console.log(`✅ 経歴フィールドマッピング: "${field.name}" → PDF解析結果`);
+            } else if (!mapping.value && field.name === '職務経歴書') {
+                // 職務経歴書フィールドはファイルアップロード用なのでPDF解析結果をマッピングしない
+                console.log(`⏭️ 職務経歴書フィールドスキップ: "${field.name}" (ファイルアップロード用)`);
             }
 
             // RAコメントからマッピング（年収関連）
