@@ -53,7 +53,8 @@ function extractJobNameFromComplexFormat(data) {
         warnings: [],
         errors: [],
         originalData: null,
-        additionalRequiredFields: [] // 追加必須項目
+        additionalRequiredFields: [], // 追加必須項目
+        raCommentFields: [] // RAコメントから検出された項目
     };
 
     try {
@@ -85,12 +86,31 @@ function extractJobNameFromComplexFormat(data) {
                 }
             }
             
-            // パターン: "W送付" + 求人名 + "※"
-            const pattern = /W送付\s*(.+?)\s*※/;
-            const match = raMemoRaw.match(pattern);
+            // RAコメントから追加必須項目を抽出
+            const raRequiredFields = extractRequiredFieldsFromRA(raMemoRaw);
+            if (raRequiredFields.length > 0) {
+                extractionResult.raCommentFields = raRequiredFields;
+                extractionResult.additionalRequiredFields = [...extractionResult.additionalRequiredFields, ...raRequiredFields];
+                // 重複除去
+                extractionResult.additionalRequiredFields = [...new Set(extractionResult.additionalRequiredFields)];
+                extractionResult.warnings.push(`RAコメントから追加必須項目を検出: ${raRequiredFields.join(', ')}`);
+            }
             
-            if (match && match[1]) {
-                let jobName = match[1].trim();
+            // パターン: "W送付" の後を求人名として読む（※がある場合はそこで区切る）
+            const wSendPattern = /W送付\s*(.+)/;
+            const wSendMatch = raMemoRaw.match(wSendPattern);
+            
+            if (wSendMatch && wSendMatch[1]) {
+                let afterWSend = wSendMatch[1].trim();
+                let jobName;
+                
+                // ※がある場合は、そこで区切る
+                if (afterWSend.includes('※')) {
+                    jobName = afterWSend.split('※')[0].trim();
+                } else {
+                    // ※がない場合は、W送付の後全体を求人名とする
+                    jobName = afterWSend;
+                }
                 
                 // 安全性チェック
                 if (jobName.length < 3) {
@@ -106,7 +126,7 @@ function extractJobNameFromComplexFormat(data) {
                 extractionResult.success = true;
                 extractionResult.extractedName = jobName;
                 extractionResult.confidence = 95;
-                extractionResult.method = 'ra_memo_pattern_extraction';
+                extractionResult.method = 'ra_memo_pattern_extraction_flexible';
                 
                 // 追加の検証
                 if (jobName.includes('【') && jobName.includes('】')) {
@@ -116,7 +136,7 @@ function extractJobNameFromComplexFormat(data) {
                 
                 return extractionResult;
             } else {
-                extractionResult.errors.push("ra_memo_rawから求人名パターンを抽出できませんでした");
+                extractionResult.errors.push("ra_memo_rawから「W送付」パターンを抽出できませんでした");
                 return extractionResult;
             }
         }
@@ -129,6 +149,129 @@ function extractJobNameFromComplexFormat(data) {
         extractionResult.errors.push(`抽出処理中にエラーが発生しました: ${error.message}`);
         return extractionResult;
     }
+}
+
+// RAコメントから追加必須項目を抽出
+function extractRequiredFieldsFromRA(raComment) {
+    const afterNote = raComment.split('※')[1];
+    if (!afterNote) return [];
+    
+    const requiredFields = [];
+    const detectionLog = [];
+    
+    // 年収関連のルール定義
+    const salaryRules = {
+        currentSalary: {
+            patterns: [/現年収[：:\s]*(\d+|０)万円?/g, /現在年収[：:\s]*(\d+|０)万円?/g],
+            fieldNames: ['現在の年収', '年収（現在）', '現年収'],
+            specialCases: { '０': '退職ケース', '0': '退職ケース' }
+        },
+        desiredSalary: {
+            patterns: [/希望年収[：:\s]*(\d+)万円?/g],
+            fieldNames: ['希望年収', '年収（希望）'],
+            contextCheck: true
+        },
+        minimumSalary: {
+            patterns: [/最低[希望]*年収[：:\s]*(\d+)万円?/g],
+            fieldNames: ['最低希望年収', '年収（最低）']
+        }
+    };
+    
+    // その他のルール定義
+    const otherRules = {
+        salaryNote: {
+            patterns: [/希望年収.*?[【（\[].*?(仮|面談|確認).*?[】）\]]/g],
+            fieldNames: ['その他希望条件', 'その他の希望条件', '備考']
+        },
+        currentCompany: {
+            patterns: [/現職[はわ：:\s]*(.+?)[株式会社|会社|Corporation|Corp]/g],
+            fieldNames: ['現所属', '現在の所属', '勤務先']
+        }
+    };
+    
+    // 年収関連をチェック
+    Object.entries(salaryRules).forEach(([type, rule]) => {
+        rule.patterns.forEach(pattern => {
+            const matches = afterNote.match(pattern);
+            if (matches) {
+                matches.forEach(match => {
+                    // 特殊ケース処理（退職等）
+                    if (rule.specialCases) {
+                        const valueMatch = match.match(/(\d+|０)/);
+                        if (valueMatch) {
+                            const value = valueMatch[1];
+                            if (rule.specialCases[value]) {
+                                detectionLog.push(`${type}: ${rule.specialCases[value]} - ${match}`);
+                            }
+                        }
+                    }
+                    
+                    // 希望年収の場合は後続文言もチェック
+                    if (rule.contextCheck && type === 'desiredSalary') {
+                        if (otherRules.salaryNote.patterns.some(p => afterNote.match(p))) {
+                            requiredFields.push(...otherRules.salaryNote.fieldNames);
+                            detectionLog.push('希望年収補足文言検出 → その他希望条件を必須化');
+                        }
+                    }
+                    
+                    requiredFields.push(...rule.fieldNames);
+                    detectionLog.push(`${type}検出: ${match}`);
+                });
+            }
+        });
+    });
+    
+    // その他条件をチェック
+    Object.entries(otherRules).forEach(([type, rule]) => {
+        if (type === 'salaryNote') return; // 上で処理済み
+        
+        rule.patterns.forEach(pattern => {
+            const matches = afterNote.match(pattern);
+            if (matches) {
+                requiredFields.push(...rule.fieldNames);
+                detectionLog.push(`${type}検出: ${matches[0]}`);
+            }
+        });
+    });
+    
+    // 許可されたフィールドのみをフィルタリング
+    const allowedFields = [
+        // 年収関連
+        '現在の年収', '年収（現在）', '現年収',
+        '希望年収', '年収（希望）',
+        '最低希望年収', '年収（最低）',
+        // その他希望条件
+        'その他希望条件', 'その他の希望条件', '備考',
+        // 現所属
+        '現所属', '現在の所属', '勤務先'
+    ];
+    
+    const uniqueFields = [...new Set(requiredFields)];
+    const filteredFields = uniqueFields.filter(field => allowedFields.includes(field));
+    const rejectedFields = uniqueFields.filter(field => !allowedFields.includes(field));
+    
+    if (rejectedFields.length > 0) {
+        detectionLog.push(`未対応項目を除外: ${rejectedFields.join(', ')}`);
+        
+        // 曖昧な表現の警告
+        const ambiguousTerms = ['履歴書', '職務経歴書', '経歴', 'スキル', '資格', '学歴'];
+        const foundAmbiguous = rejectedFields.filter(field => 
+            ambiguousTerms.some(term => field.includes(term))
+        );
+        
+        if (foundAmbiguous.length > 0) {
+            detectionLog.push(`⚠️ 曖昧な表現を検出（解釈困難のため除外）: ${foundAmbiguous.join(', ')}`);
+        }
+    }
+    
+    console.log('RAコメント解析:', {
+        originalText: afterNote,
+        detectedElements: detectionLog,
+        requiredFields: filteredFields,
+        rejectedFields: rejectedFields.length > 0 ? rejectedFields : undefined
+    });
+    
+    return filteredFields;
 }
 
 // 文字列正規化関数
@@ -577,7 +720,7 @@ async function clickRecommendationButton(page, targetJobName) {
 }
 
 // 推薦ページのフォーム項目を解析する関数
-async function analyzeRecommendationForm(page, jobName, additionalRequiredFields = []) {
+async function analyzeRecommendationForm(page, jobName, additionalRequiredFields = [], raCommentFields = []) {
     const analysisResult = {
         success: false,
         error: null,
@@ -591,6 +734,7 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
         companyName: null,
         additionalRequiredOverrides: {
             specifiedFields: additionalRequiredFields || [],
+            raCommentFields: raCommentFields || [],
             appliedCount: 0,
             appliedFields: []
         }
@@ -802,28 +946,65 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
         analysisResult.fields = formData.fields;
         analysisResult.companyName = formData.companyName;
         
-        // 追加必須項目の適用（既存機能の後に実行）
-        if (additionalRequiredFields && additionalRequiredFields.length > 0) {
-            additionalRequiredFields.forEach(requiredField => {
+        // 追加必須項目の適用（JSON指定項目とRAコメント項目を統合処理）
+        const allAdditionalFields = [...(additionalRequiredFields || []), ...(raCommentFields || [])];
+        if (allAdditionalFields.length > 0) {
+            allAdditionalFields.forEach(requiredField => {
                 const matches = analysisResult.fields.filter(field => {
                     const fieldName = field.name.toLowerCase();
                     const requiredName = requiredField.toLowerCase();
                     
-                    // 完全一致または部分一致
-                    return fieldName === requiredName || 
-                           fieldName.includes(requiredName) || 
-                           requiredName.includes(fieldName);
+                    // より厳密なマッチングロジック
+                    let isMatch = false;
+                    
+                    // 1. 完全一致
+                    if (fieldName === requiredName) {
+                        isMatch = true;
+                    }
+                    // 2. 特定の年収関連項目の厳密マッチング
+                    else if (requiredName.includes('年収')) {
+                        // 現在の年収系
+                        if ((requiredName.includes('現在') || requiredName.includes('現年収')) && 
+                            ((fieldName.includes('現在') && fieldName.includes('年収')) || fieldName.includes('現年収')) && 
+                            !fieldName.includes('希望') && !fieldName.includes('最低')) {
+                            isMatch = true;
+                        }
+                        // 希望年収系
+                        else if (requiredName.includes('希望') && 
+                                (fieldName.includes('希望') && fieldName.includes('年収')) && 
+                                !fieldName.includes('最低')) {
+                            isMatch = true;
+                        }
+                        // 最低年収系
+                        else if (requiredName.includes('最低') && 
+                                (fieldName.includes('最低') && fieldName.includes('年収'))) {
+                            isMatch = true;
+                        }
+                    }
+                    // 3. その他の項目は部分一致
+                    else {
+                        isMatch = fieldName.includes(requiredName) || requiredName.includes(fieldName);
+                    }
+                    
+                    // デバッグログ
+                    if (isMatch) {
+                        console.log(`フィールドマッチング: "${requiredField}" → "${field.name}" (マッチ)`);
+                    }
+                    
+                    return isMatch;
                 });
                 
                 matches.forEach(field => {
                     if (!field.required) {
                         field.required = true;
-                        field.detectionMethod += ' + additional-required';
+                        const sourceType = (raCommentFields || []).includes(requiredField) ? 'RA-comment' : 'JSON-specified';
+                        field.detectionMethod += ` + additional-required(${sourceType})`;
                         analysisResult.additionalRequiredOverrides.appliedCount++;
                         analysisResult.additionalRequiredOverrides.appliedFields.push({
                             fieldName: field.name,
                             originalRequired: false,
-                            overriddenBy: requiredField
+                            overriddenBy: requiredField,
+                            sourceType: sourceType
                         });
                     }
                 });
@@ -1117,7 +1298,17 @@ app.post('/execute', async (req, res) => {
             // ページ遷移を待機
             await new Promise(resolve => setTimeout(resolve, 3000));
             
-            formAnalysisResult = await analyzeRecommendationForm(page, matchResult.matchedJob, extractionResult.additionalRequiredFields);
+            // JSON指定項目とRAコメント項目を分離
+            const jsonRequiredFields = extractionResult.additionalRequiredFields.filter(field => 
+                !extractionResult.raCommentFields.includes(field)
+            );
+            
+            formAnalysisResult = await analyzeRecommendationForm(
+                page, 
+                matchResult.matchedJob, 
+                jsonRequiredFields,
+                extractionResult.raCommentFields
+            );
             
             if (formAnalysisResult.success) {
                 sendLog(`フォーム解析完了: ${formAnalysisResult.totalFields}個の項目を検出`, 'success');

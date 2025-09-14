@@ -1,0 +1,31 @@
+{
+  "recommendation_no_raw": "20250914-RA002-退職ケース",
+  "kintone": {
+    "source": "kintone",
+    "fetched_at": "2025-09-14T14:05:00+09:00",
+    "record": {
+      "ats_type_1_raw": "HERP",
+      "browser_name_1_raw": "Chrome",
+      "company_name_raw": "株式会社リクルート",
+      "ats_url_1_raw": "https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw",
+      "ats_id_1_raw": "agent@example.com",
+      "ats_pw_1_raw": "password123",
+      "notes_1_raw": null,
+      "ats_input_type_1_raw": "追加指定項目あり＋PDF",
+      "ats_input_language_1_raw": "すべて日本語",
+      "pdf_processing_required_raw": null,
+      "additional_required_fields_raw": []
+    }
+  },
+  "calib": {
+    "source": "calib",
+    "fetched_at": "2025-09-14T14:05:00+09:00",
+    "record": {
+      "ra_memo_raw": "W送付プロジェクトマネージャー※現年収:０万円（退職のため）、希望年収:700万円",
+      "pdf_export": {
+        "performed_raw": true,
+        "file_path": "/downloads/calib/20250914-RA002.pdf"
+      }
+    }
+  }
+} 

@@ -647,7 +647,21 @@
             if (formAnalysis.additionalRequiredOverrides && formAnalysis.additionalRequiredOverrides.specifiedFields.length > 0) {
                 formHtml += '<div class="result-item" style="background-color: #fff3e0; border-left-color: #ff9800;">';
                 formHtml += '<strong>🔧 追加必須項目による上書き</strong><br>';
-                formHtml += `<strong>指定された項目:</strong> ${formAnalysis.additionalRequiredOverrides.specifiedFields.join(', ')}<br>`;
+                
+                // JSON指定項目とRAコメント項目を分けて表示
+                const jsonFields = formAnalysis.additionalRequiredOverrides.specifiedFields.filter(field => 
+                    !formAnalysis.additionalRequiredOverrides.raCommentFields || 
+                    !formAnalysis.additionalRequiredOverrides.raCommentFields.includes(field)
+                );
+                const raFields = formAnalysis.additionalRequiredOverrides.raCommentFields || [];
+                
+                if (jsonFields.length > 0) {
+                    formHtml += `<strong>JSON指定項目:</strong> ${jsonFields.join(', ')}<br>`;
+                }
+                if (raFields.length > 0) {
+                    formHtml += `<strong>RAコメント検出項目:</strong> ${raFields.join(', ')}<br>`;
+                }
+                
                 formHtml += `<strong>適用件数:</strong> ${formAnalysis.additionalRequiredOverrides.appliedCount}件<br>`;
                 
                 if (formAnalysis.additionalRequiredOverrides.appliedFields && formAnalysis.additionalRequiredOverrides.appliedFields.length > 0) {
