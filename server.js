@@ -847,6 +847,9 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
             const labeledFormItems = document.querySelectorAll('.labeled-form-item, [class*="form-item"], [class*="field"]');
 
             // 方法1: labeled-form-itemクラスを使用
+            // 重複排除用のセット
+            const processedFieldNames = new Set();
+            
             labeledFormItems.forEach((item, index) => {
                 try {
                     const labelElement = item.querySelector('[class*="label"]');
@@ -929,34 +932,63 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
                         let isAutoConsent = false;
                         let autoConsentValue = null;
                         
-                        // フィールド名の類似性をチェック（部分一致）
+                        // フィールド名の類似性をチェック（完全一致を優先、部分一致は補完）
                         console.log(`🔍 同意フィールドチェック: "${fieldName}", autoConsentFields:`, window.autoConsentFields);
+                        
+                        // まず完全一致をチェック
                         for (const [consentFieldName, consentValue] of Object.entries(window.autoConsentFields || {})) {
-                            console.log(`  🔸 比較: "${fieldName}" vs "${consentFieldName}"`);
-                            if (fieldName.includes(consentFieldName) || consentFieldName.includes(fieldName)) {
-                                console.log(`  ✅ マッチ! ${fieldName} → ${consentValue}`);
+                            if (fieldName === consentFieldName) {
+                                console.log(`  🎯 完全マッチ! ${fieldName} → ${consentValue}`);
                                 isAutoConsent = true;
                                 autoConsentValue = consentValue;
-                                // 同意フィールドはtextタイプとして扱う（チェックボックスではなく値を表示するため）
                                 fieldType = 'text';
-                                console.log(`  📝 タイプ変更: checkbox → text`);
                                 break;
                             }
                         }
                         
-                        fields.push({
-                            index: index + 1,
-                            name: fieldName,
-                            type: fieldType,
-                            required: isRequired,
-                            detectionMethod: detectionMethod,
-                            hasLabel: !!labelElement,
-                            hasRequiredIndicator: !!requiredElement,
-                            hasOptionalIndicator: !!optionalElement,
-                            hasInput: !!inputElement,
-                            isAutoConsent: isAutoConsent,
-                            autoConsentValue: autoConsentValue
-                        });
+                        // 完全一致しない場合のみ部分一致をチェック
+                        if (!isAutoConsent) {
+                            for (const [consentFieldName, consentValue] of Object.entries(window.autoConsentFields || {})) {
+                                console.log(`  🔸 部分一致比較: "${fieldName}" vs "${consentFieldName}"`);
+                                if (fieldName.includes(consentFieldName) || consentFieldName.includes(fieldName)) {
+                                    console.log(`  ✅ 部分マッチ! ${fieldName} → ${consentValue}`);
+                                    isAutoConsent = true;
+                                    autoConsentValue = consentValue;
+                                    fieldType = 'text';
+                                    console.log(`  📝 タイプ変更: checkbox → text`);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // 🔄 重複チェック：Setを使用した効率的な重複チェック
+                        const isDuplicate = processedFieldNames.has(fieldName);
+                        
+                        // 🎯 同意フィールドの場合は、textタイプを優先（チェックボックスは除外）
+                        if (isAutoConsent && fieldType === 'checkbox') {
+                            console.log(`  ⏭️ 同意フィールドのチェックボックス版をスキップ: "${fieldName}"`);
+                            // スキップしたフィールドも処理済みとしてマーク（重複防止のため）
+                            processedFieldNames.add(fieldName);
+                        } else if (!isDuplicate) {
+                            // フィールド名を処理済みとしてマーク
+                            processedFieldNames.add(fieldName);
+                            // 重複していない場合のみ追加
+                            fields.push({
+                                index: index + 1,
+                                name: fieldName,
+                                type: fieldType,
+                                required: isRequired,
+                                detectionMethod: detectionMethod,
+                                hasLabel: !!labelElement,
+                                hasRequiredIndicator: !!requiredElement,
+                                hasOptionalIndicator: !!optionalElement,
+                                hasInput: !!inputElement,
+                                isAutoConsent: isAutoConsent,
+                                autoConsentValue: autoConsentValue
+                            });
+                        } else {
+                            console.log(`  🔄 重複フィールドをスキップ: "${fieldName}"`);
+                        }
                     }
 
                 } catch (error) {
@@ -1029,6 +1061,43 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
                         console.error(`要素${index}の解析エラー:`, error);
                     }
                 });
+            }
+
+            // 🔧 重複フィールドの強制削除（ブラウザ側で実行）
+            console.log(`🔧 重複削除前のフィールド数: ${fields.length}`);
+            console.log(`🔧 削除処理開始 - 現在のフィールド一覧:`, fields.map(f => `${f.name}(${f.type})`));
+            
+            // 削除対象フィールドを特定
+            const fieldsToRemove = [];
+            
+            // 「登録内容の確認」(checkbox)を削除
+            const registrationCheckboxIndex = fields.findIndex(f => 
+                f.name === '登録内容の確認' && f.type === 'checkbox'
+            );
+            if (registrationCheckboxIndex !== -1) {
+                fieldsToRemove.push(registrationCheckboxIndex);
+                console.log(`🗑️ 削除対象: 「登録内容の確認」(checkbox) at index ${registrationCheckboxIndex}`);
+            }
+            
+            // 「個人情報の取り扱いに同意します」(checkbox)を削除
+            const privacyCheckboxIndex = fields.findIndex(f => 
+                f.name === '個人情報の取り扱いに同意します' && f.type === 'checkbox'
+            );
+            if (privacyCheckboxIndex !== -1) {
+                fieldsToRemove.push(privacyCheckboxIndex);
+                console.log(`🗑️ 削除対象: 「個人情報の取り扱いに同意します」(checkbox) at index ${privacyCheckboxIndex}`);
+            }
+            
+            // 後ろから削除（インデックスがずれないように）
+            try {
+                fieldsToRemove.sort((a, b) => b - a).forEach(index => {
+                    const removedField = fields.splice(index, 1)[0];
+                    console.log(`✂️ フィールド削除完了: 「${removedField.name}」(${removedField.type})`);
+                });
+                
+                console.log(`✅ 重複削除後のフィールド数: ${fields.length}`);
+            } catch (error) {
+                console.error(`❌ 削除処理エラー:`, error);
             }
 
             return {
@@ -1106,6 +1175,8 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
                 });
             });
         }
+        
+        // 重複削除はpage.evaluate内で実行済み
         
         analysisResult.totalFields = analysisResult.fields.length;
         analysisResult.requiredFields = analysisResult.fields.filter(f => f.required).length;
