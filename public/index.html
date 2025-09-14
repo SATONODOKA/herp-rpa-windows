@@ -781,6 +781,8 @@
             if (result.formAnalysis && result.formAnalysis.dataMapping) {
                 displayRequiredFieldsData(result.formAnalysis.dataMapping);
             }
+            
+            // フォーム自動入力機能は削除（HERPサイトへの直接入力は行わない）
         }
         
         function displayFormAnalysis(formAnalysis) {
@@ -1041,23 +1043,18 @@
             let html = '<div class="analysis-section">';
             html += `<h4>📄 PDF解析結果</h4>`;
             html += `<div class="analysis-summary">`;
-            html += `<p><strong>抽出方法:</strong> ${pdfAnalysis.extractionMethod}</p>`;
-            html += `<p><strong>ページ数:</strong> ${pdfAnalysis.pdfPages}</p>`;
-            html += `<p><strong>文字数:</strong> ${pdfAnalysis.textLength}</p>`;
+            html += `<p><strong>抽出方法:</strong> ${pdfAnalysis.method || 'pdf-parse-simple'}</p>`;
+            html += `<p><strong>信頼度:</strong> ${pdfAnalysis.confidence || 0}%</p>`;
             html += `</div>`;
 
             html += `<h5>抽出された個人情報</h5>`;
             html += `<div class="pdf-data">`;
-            const formData = pdfAnalysis.analyzedData.formData;
             
-            if (formData.name) html += `<p><strong>氏名:</strong> ${formData.name}</p>`;
-            if (formData.furigana) html += `<p><strong>ふりがな:</strong> ${formData.furigana}</p>`;
-            if (formData.email) html += `<p><strong>メール:</strong> ${formData.email}</p>`;
-            if (formData.phone) html += `<p><strong>電話:</strong> ${formData.phone}</p>`;
-            if (formData.address) html += `<p><strong>住所:</strong> ${formData.address}</p>`;
-            if (formData.birthDate) html += `<p><strong>生年月日:</strong> ${formData.birthDate}</p>`;
-            if (formData.gender) html += `<p><strong>性別:</strong> ${formData.gender}</p>`;
-            if (formData.currentCompany) html += `<p><strong>現在の会社:</strong> ${formData.currentCompany}</p>`;
+            if (pdfAnalysis.extractedName) html += `<p><strong>氏名:</strong> ${pdfAnalysis.extractedName}</p>`;
+            if (pdfAnalysis.furigana) html += `<p><strong>ふりがな:</strong> ${pdfAnalysis.furigana}</p>`;
+            
+            // 未実装項目は表示しない
+            html += `<p><em>その他の項目（メール、電話番号など）は今後実装予定</em></p>`;
             
             html += `</div>`;
             html += '</div>';
@@ -1120,6 +1117,8 @@
             html += '</div>';
             requiredFieldsDataDiv.innerHTML = html;
         }
+
+        // フォーム自動入力機能は削除（HERPサイトへの直接入力は行わない）
 
         // 初期化
         addLog('求人照合RPAツール (PDF統合版) が起動しました');

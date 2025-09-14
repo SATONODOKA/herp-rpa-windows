@@ -1,0 +1,218 @@
+{
+  "_comment": "HERP ATS フォーム自動入力用 JSON サンプル",
+  "_description": "このJSONファイルは、HERPのATSフォームに自動入力するためのマッピング定義です",
+  "_usage": "ats_form_mapping オブジェクト内のセレクタと値を、対象サイトに合わせて調整してください",
+  
+  "basic_info": {
+    "recommendation_no": "推薦番号（任意）",
+    "target_url": "https://agent.herp.cloud/p/YOUR_FORM_ID",
+    "login_required": true,
+    "login_credentials": {
+      "username": "your_username",
+      "password": "your_password"
+    }
+  },
+
+  "candidate_data": {
+    "name": "山田 太郎",
+    "company": "株式会社サンプル",
+    "age": "28",
+    "education": "○○大学工学部情報学科",
+    "phone": "080-1234-5678",
+    "email": "yamada.taro@example.com",
+    "current_salary": "500",
+    "desired_salary": "600", 
+    "minimum_salary": "550",
+    "recommendation_comment": "優秀なバックエンドエンジニアです。Go言語とクラウド技術に精通しており、チームリーダーとしての経験も豊富です。",
+    "career_summary": "○○大学卒業後、スタートアップ企業でWebアプリケーション開発に従事。その後、中規模SaaS企業でマイクロサービス設計・実装を担当。現在はテックリードとして5名のチームを率いています。",
+    "portfolio_urls": [
+      "https://github.com/yamada-taro",
+      "https://yamada-portfolio.com"
+    ],
+    "additional_notes": "リモートワーク希望。ストックオプションにも興味があります。"
+  },
+
+  "ats_form_mapping": {
+    "_comment_required": "=== 必須項目 ===",
+    
+    "input[placeholder='例) 採用 太郎']": "山田 太郎",
+    "input[placeholder='例) 株式会社HERP']": "株式会社サンプル",
+    "input[placeholder='例) herp@herp.co.jp']": "yamada.taro@example.com",
+    
+    "_comment_semi_required": "=== 準必須項目（多くの場合必要） ===",
+    
+    "input[placeholder='例) 080-1234-5678']": "080-1234-5678",
+    "input[placeholder='例) 27']": "28",
+    
+    "_comment_optional_basic": "=== 任意項目（基本情報） ===",
+    
+    "input[placeholder='例) 〇〇大学人事学部採用学科']": "○○大学工学部情報学科",
+    
+    "_comment_salary": "=== 年収関連（任意だが重要） ===",
+    
+    "input[placeholder='例) 500']": "500",
+    "input[placeholder='例) 600']": "600", 
+    "input[placeholder='例) 400']": "550",
+    
+    "_comment_text_areas": "=== テキストエリア項目（任意） ===",
+    
+    "textarea[placeholder^='先月まで株式会社']": "優秀なバックエンドエンジニアです。Go言語とクラウド技術に精通しており、チームリーダーとしての経験も豊富です。技術的な課題解決能力が高く、新しい技術の習得も早いです。",
+    
+    "textarea[placeholder^='◯◯大学卒業後']": "○○大学工学部情報学科卒業後、スタートアップ企業でWebアプリケーション開発に従事。Ruby on RailsとReactを使用したSaaSプロダクトの開発を担当。その後、中規模SaaS企業に転職し、Go言語を使用したマイクロサービス設計・実装を担当。現在はテックリードとして5名のエンジニアチームを率い、アーキテクチャ設計から実装まで幅広く関わっています。",
+    
+    "textarea[placeholder^='例) ストックオプション']": "リモートワーク可能な環境を希望します。ストックオプションにも興味があり、会社の成長に貢献したいと考えています。技術的な挑戦ができる環境であれば、年収面での多少の調整は可能です。",
+    
+    "_comment_urls": "=== URL項目（任意） ===",
+    
+    "input[data-index='0']": "https://github.com/yamada-taro",
+    "input[data-index='1']": "https://yamada-portfolio.com",
+    
+    "_comment_checkboxes": "=== チェックボックス（通常必須） ===",
+    
+    "checkbox_登録内容に誤りはありません": true,
+    "checkbox_個人情報の取り扱いに同意します": true,
+    
+    "_comment_submit": "=== 送信ボタン ===",
+    
+    "button[type='submit']": "click"
+  },
+
+  "field_priority_guide": {
+    "priority_1_required": [
+      "氏名 (input[placeholder='例) 採用 太郎'])",
+      "会社名 (input[placeholder='例) 株式会社HERP'])", 
+      "メールアドレス (input[placeholder='例) herp@herp.co.jp'])",
+      "同意チェックボックス"
+    ],
+    "priority_2_important": [
+      "電話番号 (input[placeholder='例) 080-1234-5678'])",
+      "年齢 (input[placeholder='例) 27'])",
+      "推薦コメント (textarea[placeholder^='先月まで株式会社'])"
+    ],
+    "priority_3_optional": [
+      "最終学歴 (input[placeholder='例) 〇〇大学人事学部採用学科'])",
+      "年収情報 (各種placeholder='例) 500'等)",
+      "経歴詳細 (textarea[placeholder^='◯◯大学卒業後'])",
+      "URL情報 (input[data-index='0'], input[data-index='1'])",
+      "備考 (textarea[placeholder^='例) ストックオプション'])"
+    ]
+  },
+
+  "selector_patterns": {
+    "_description": "HERPフォームでよく使われるセレクタパターン",
+    
+    "text_inputs": {
+      "name": "input[placeholder*='採用'], input[placeholder*='太郎'], input[placeholder*='名前']",
+      "company": "input[placeholder*='株式会社'], input[placeholder*='会社']", 
+      "age": "input[placeholder*='27'], input[placeholder*='年齢']",
+      "education": "input[placeholder*='大学'], input[placeholder*='学歴']",
+      "phone": "input[placeholder*='080'], input[placeholder*='電話']",
+      "email": "input[placeholder*='@'], input[placeholder*='メール']"
+    },
+    
+    "salary_inputs": {
+      "current": "input[placeholder*='500'], input[placeholder*='現在']",
+      "desired": "input[placeholder*='600'], input[placeholder*='希望']", 
+      "minimum": "input[placeholder*='400'], input[placeholder*='最低']"
+    },
+    
+    "text_areas": {
+      "recommendation": "textarea[placeholder^='先月'], textarea[placeholder*='推薦']",
+      "career": "textarea[placeholder^='大学'], textarea[placeholder*='経歴']",
+      "notes": "textarea[placeholder^='例) ストック'], textarea[placeholder*='備考']"
+    },
+    
+    "url_inputs": {
+      "url1": "input[data-index='0'], input[placeholder*='URL'], input[placeholder*='GitHub']",
+      "url2": "input[data-index='1'], input[placeholder*='ポートフォリオ']"
+    },
+    
+    "checkboxes": {
+      "content_agreement": "checkbox_登録内容, input[type='checkbox'] + label:contains('登録内容')",
+      "privacy_agreement": "checkbox_個人情報, input[type='checkbox'] + label:contains('個人情報')"
+    }
+  },
+
+  "validation_rules": {
+    "required_fields": {
+      "name": {
+        "max_length": 50,
+        "pattern": "^[\\u3040-\\u309F\\u30A0-\\u30FF\\u4E00-\\u9FAF\\s]+$",
+        "description": "日本語の氏名（ひらがな、カタカナ、漢字、スペース）"
+      },
+      "email": {
+        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+        "description": "有効なメールアドレス形式"
+      },
+      "phone": {
+        "pattern": "^[0-9-]+$",
+        "description": "数字とハイフンのみ"
+      }
+    },
+    "optional_fields": {
+      "age": {
+        "type": "number",
+        "min": 18,
+        "max": 70,
+        "description": "18-70の数値"
+      },
+      "salary": {
+        "type": "number", 
+        "min": 200,
+        "max": 2000,
+        "description": "200-2000の数値（万円単位）"
+      }
+    }
+  },
+
+  "customization_examples": {
+    "_description": "他のサイト用にカスタマイズする際の例",
+    
+    "example_1_different_placeholders": {
+      "ats_form_mapping": {
+        "input[placeholder='お名前を入力してください']": "山田 太郎",
+        "input[placeholder='会社名']": "株式会社サンプル",
+        "input[placeholder='メールアドレス']": "yamada.taro@example.com"
+      }
+    },
+    
+    "example_2_id_based_selectors": {
+      "ats_form_mapping": {
+        "#candidate_name": "山田 太郎",
+        "#company_name": "株式会社サンプル", 
+        "#email_address": "yamada.taro@example.com"
+      }
+    },
+    
+    "example_3_class_based_selectors": {
+      "ats_form_mapping": {
+        ".form-input[name='name']": "山田 太郎",
+        ".form-input[name='company']": "株式会社サンプル",
+        ".form-input[name='email']": "yamada.taro@example.com"
+      }
+    }
+  },
+
+  "implementation_notes": {
+    "selector_discovery": [
+      "ブラウザの開発者ツールでフォーム要素を調査",
+      "placeholder属性、id、class、name属性を確認", 
+      "要素の階層構造とユニークな特徴を特定",
+      "動的に生成される要素の場合は安定したセレクタを選択"
+    ],
+    
+    "data_mapping": [
+      "必須項目を最優先で設定",
+      "任意項目は段階的に追加",
+      "文字数制限や入力形式を事前に確認",
+      "テスト用のダミーデータで動作確認"
+    ],
+    
+    "error_handling": [
+      "要素が見つからない場合のフォールバック",
+      "入力値の検証とエラーログ出力",
+      "部分的な入力失敗でも処理を継続",
+      "チェックボックスの状態確認"
+    ]
+  }
+} 

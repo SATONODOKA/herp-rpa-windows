@@ -4,7 +4,7 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { extractResumeData } = require('./pdf_processing/pdf-extractor');
+const { SimplePDFExtractor } = require('./pdf_processing/simple-pdf-extractor');
 
 const app = express();
 const port = 3000;
@@ -1117,6 +1117,8 @@ async function saveFormAnalysisToFile(analysisResult, jobName) {
     }
 }
 
+// フォーム自動入力機能は削除（HERPサイトへの直接入力は行わない）
+
 // PDF解析結果と必須項目をマッピングする関数
 async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extractionResult) {
     try {
@@ -1125,12 +1127,16 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
             mappedFields: 0,
             mappings: [],
             unmappedFields: [],
-            pdfData: pdfResult.analyzedData.formData,
+            pdfData: {
+                name: pdfResult.extractedName,
+                furigana: pdfResult.furigana,
+                confidence: pdfResult.confidence
+            },
             raCommentData: {}
         };
 
         // デバッグ: PDFデータの内容をログ出力
-        sendLog(`PDF抽出データ: ${JSON.stringify(pdfResult.analyzedData.formData, null, 2)}`, 'info');
+        sendLog(`PDF抽出データ: 氏名「${pdfResult.extractedName || '未検出'}」, フリガナ「${pdfResult.furigana || '未検出'}」`, 'info');
         sendLog(`RAコメント: ${extractionResult.originalData || 'なし'}`, 'info');
 
         // 必須項目を取得（フロントエンドと同じ判定ロジックを使用）
@@ -1163,39 +1169,23 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 confidence: 0
             };
 
-            // PDFデータからマッピング
-            if (field.name.includes('氏名') || field.name.includes('名前')) {
-                mapping.value = pdfResult.analyzedData.formData.name;
-                mapping.source = 'PDF';
-                mapping.confidence = pdfResult.analyzedData.formData.name ? 95 : 0;
+            // PDFデータからマッピング（新しい抽出器の結果を使用）
+            if (field.name.includes('氏名') || field.name.includes('名前') || field.name.includes('応募者氏名')) {
+                mapping.value = pdfResult.extractedName;
+                mapping.source = 'PDF-simple-extractor';
+                mapping.confidence = pdfResult.extractedName ? pdfResult.confidence : 0;
             } else if (field.name.includes('ふりがな') || field.name.includes('フリガナ')) {
-                mapping.value = pdfResult.analyzedData.formData.furigana;
-                mapping.source = 'PDF';
-                mapping.confidence = pdfResult.analyzedData.formData.furigana ? 90 : 0;
+                mapping.value = pdfResult.furigana;
+                mapping.source = 'PDF-simple-extractor';
+                mapping.confidence = pdfResult.furigana ? Math.min(pdfResult.confidence, 90) : 0;
             } else if (field.name.includes('メール') || field.name.includes('email')) {
-                mapping.value = pdfResult.analyzedData.formData.email;
-                mapping.source = 'PDF';
-                mapping.confidence = pdfResult.analyzedData.formData.email ? 95 : 0;
+                mapping.value = null; // まだ未実装
+                mapping.source = 'PDF-simple-extractor';
+                mapping.confidence = 0;
             } else if (field.name.includes('電話') || field.name.includes('TEL')) {
-                mapping.value = pdfResult.analyzedData.formData.phone;
-                mapping.source = 'PDF';
-                mapping.confidence = pdfResult.analyzedData.formData.phone ? 95 : 0;
-            } else if (field.name.includes('住所')) {
-                mapping.value = pdfResult.analyzedData.formData.address;
-                mapping.source = 'PDF';
-                mapping.confidence = pdfResult.analyzedData.formData.address ? 90 : 0;
-            } else if (field.name.includes('生年月日') || field.name.includes('誕生日')) {
-                mapping.value = pdfResult.analyzedData.formData.birthDate;
-                mapping.source = 'PDF';
-                mapping.confidence = pdfResult.analyzedData.formData.birthDate ? 95 : 0;
-            } else if (field.name.includes('性別')) {
-                mapping.value = pdfResult.analyzedData.formData.gender;
-                mapping.source = 'PDF';
-                mapping.confidence = pdfResult.analyzedData.formData.gender ? 90 : 0;
-            } else if (field.name.includes('現所属') || field.name.includes('勤務先')) {
-                mapping.value = pdfResult.analyzedData.formData.currentCompany;
-                mapping.source = 'PDF';
-                mapping.confidence = pdfResult.analyzedData.formData.currentCompany ? 85 : 0;
+                mapping.value = null; // まだ未実装
+                mapping.source = 'PDF-simple-extractor';
+                mapping.confidence = 0;
             }
 
             // RAコメントからマッピング（年収関連）
@@ -1223,6 +1213,18 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                         mapping.source = 'RAコメント';
                         mapping.confidence = 95;
                     }
+                }
+            }
+
+            // 推薦時コメント
+            if (field.name.includes('推薦') && field.name.includes('コメント')) {
+                const raComment = extractionResult.originalData || '';
+                // 推薦理由セクションを抽出
+                const recommendationMatch = raComment.match(/推薦理由[\s\S]*?(?=面談所感|転職理由|添付資料|$)/);
+                if (recommendationMatch) {
+                    mapping.value = recommendationMatch[0].replace(/推薦理由\s*/, '').trim();
+                    mapping.source = 'RAコメント';
+                    mapping.confidence = 95;
                 }
             }
 
@@ -1282,9 +1284,10 @@ async function generateEnhancedJson(originalJson, pdfResult, mappingResult, jobN
             metadata: {
                 originalJsonFile: originalJson,
                 pdfAnalysisResult: {
-                    extractionMethod: pdfResult.extractionMethod,
-                    textLength: pdfResult.textLength,
-                    pdfPages: pdfResult.pdfPages
+                    extractionMethod: pdfResult.method || 'pdf-parse-simple',
+                    extractedName: pdfResult.extractedName,
+                    furigana: pdfResult.furigana,
+                    confidence: pdfResult.confidence
                 },
                 mappingResult: {
                     mappedFields: mappingResult.mappedFields,
@@ -1388,11 +1391,18 @@ app.post('/execute', upload.fields([
         sendLog('JSONファイルを読み込んでいます...');
         const jsonData = JSON.parse(fs.readFileSync(jsonFile.path, 'utf8'));
         
-        // PDFファイルを解析
+        // PDFファイルを解析（新しいシンプル抽出器を使用）
         sendLog('PDFファイルを解析しています...');
-        const pdfResult = await extractResumeData(pdfFile.path, {
-            log: (message, type) => sendLog(`PDF: ${message}`, type)
-        });
+        const simplePDFExtractor = new SimplePDFExtractor();
+        simplePDFExtractor.debug = false; // 本番では詳細ログを無効化
+        
+        const pdfResult = await simplePDFExtractor.extractTextFromPDF(pdfFile.path);
+        
+        if (pdfResult.success) {
+            sendLog(`PDF解析完了: 氏名「${pdfResult.extractedName || '未検出'}」を抽出しました`);
+        } else {
+            sendLog(`PDF解析エラー: ${pdfResult.error}`, 'error');
+        }
 
         // 新しい抽出機能を使用
         sendLog('求人名の抽出を開始しています...');
@@ -1545,7 +1555,7 @@ app.post('/execute', upload.fields([
         
         let formAnalysisResult = null;
         
-        // ボタンクリックが成功した場合、フォーム解析を実行
+        // ボタンクリックが成功した場合、フォーム解析と自動入力を実行
         if (clickResult.success) {
             sendLog('推薦ページのフォーム項目を解析しています...', 'info');
             
@@ -1581,6 +1591,9 @@ app.post('/execute', upload.fields([
                 
                 if (mappingResult.success) {
                     sendLog(`データマッピング完了: ${mappingResult.mappedFields}個の項目をマッピング`, 'success');
+                    
+                    // フォーム自動入力はHERPに対して実行しないため削除
+                    sendLog('データマッピングが完了しました。フォーム自動入力は実行しません（HERPサイトへの直接入力は行いません）', 'info');
                     
                     // 拡張JSONを生成
                     const enhancedJson = await generateEnhancedJson(
