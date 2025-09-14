@@ -229,6 +229,100 @@
             padding: 10px;
             margin: 10px 0;
         }
+        
+        .form-analysis-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .form-analysis-table th,
+        .form-analysis-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        .form-analysis-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        .form-analysis-table .required {
+            background-color: #f8d7da;
+            color: #721c24;
+            font-weight: bold;
+        }
+        
+        .form-analysis-table .optional {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .field-row.required {
+            background-color: #fff5f5;
+        }
+
+        .field-row.optional {
+            background-color: #f9f9f9;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-right: 5px;
+        }
+
+        .required-badge {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .optional-badge {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .field-type {
+            background-color: #e3f2fd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            color: #1976d2;
+            font-weight: bold;
+        }
+        
+        .form-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .form-summary-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            border-left: 4px solid #6c757d;
+        }
+        
+        .form-summary-item.required {
+            border-left-color: #dc3545;
+        }
+        
+        .form-summary-item.optional {
+            border-left-color: #17a2b8;
+        }
+        
+        .form-summary-item.total {
+            border-left-color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -265,6 +359,11 @@
             <div class="result-section">
                 <h3>利用可能な募集職種</h3>
                 <div id="availableJobs"></div>
+            </div>
+            
+            <div class="result-section">
+                <h3>フォーム解析結果</h3>
+                <div id="formAnalysis"></div>
             </div>
         </div>
         
@@ -493,80 +592,6 @@
                 }
             }
             
-            // マッチング詳細情報の表示
-            if (result.details && result.details.checkedJobs) {
-                matchHtml += '<div class="result-item safety-info">';
-                matchHtml += '<strong>マッチング詳細:</strong><br>';
-                matchHtml += `<strong>正規化後:</strong> "${result.details.normalizedExtracted}"<br>`;
-                matchHtml += `<strong>装飾除去後:</strong> "${result.details.coreExtracted}"<br>`;
-                matchHtml += `<strong>チェック済み求人数:</strong> ${result.details.checkedJobs.length}件<br>`;
-                
-                // 全マッチの概要表示
-                if (result.details.allMatches && result.details.allMatches.length > 0) {
-                    matchHtml += `<strong>マッチした求人:</strong> ${result.details.allMatches.length}件<br>`;
-                    
-                    // マッチタイプ別の集計
-                    const matchTypeCount = {};
-                    result.details.allMatches.forEach(match => {
-                        matchTypeCount[match.type] = (matchTypeCount[match.type] || 0) + 1;
-                    });
-                    
-                    Object.entries(matchTypeCount).forEach(([type, count]) => {
-                        const typeNames = {
-                            'exact': '完全一致',
-                            'normalized_exact': '正規化後一致',
-                            'core_exact': '装飾除去後一致',
-                            'strict_subset': '部分一致'
-                        };
-                        matchHtml += `• ${typeNames[type] || type}: ${count}件<br>`;
-                    });
-                }
-                
-                if (result.details.checkedJobs.length > 0) {
-                    matchHtml += '<details style="margin-top: 10px;"><summary>詳細なチェック結果</summary>';
-                    matchHtml += '<div style="max-height: 200px; overflow-y: auto; margin-top: 5px;">';
-                    result.details.checkedJobs.forEach((jobCheck, index) => {
-                        const statusColor = jobCheck.confidence > 0 ? '#28a745' : '#6c757d';
-                        const isMatched = jobCheck.confidence > 0;
-                        matchHtml += `<div style="border-left: 3px solid ${statusColor}; padding-left: 8px; margin: 5px 0; ${isMatched ? 'background-color: #f8f9fa;' : ''}">`;
-                        matchHtml += `<strong>${index + 1}. ${jobCheck.original}</strong>`;
-                        if (isMatched) {
-                            matchHtml += ` <span style="color: ${statusColor}; font-weight: bold;">✓ MATCH</span>`;
-                        }
-                        matchHtml += `<br>`;
-                        matchHtml += `正規化: "${jobCheck.normalized}"<br>`;
-                        matchHtml += `装飾除去: "${jobCheck.core}"<br>`;
-                        matchHtml += `結果: ${jobCheck.matchType || 'no_match'} (${jobCheck.confidence}%)`;
-                        matchHtml += `</div>`;
-                    });
-                    matchHtml += '</div></details>';
-                }
-                matchHtml += '</div>';
-            }
-            
-            // 複数マッチの危険性警告
-            if (result.alternatives && result.alternatives.length > 1) {
-                matchHtml += '<div class="result-item" style="background-color: #f8d7da; border-left-color: #dc3545;">';
-                matchHtml += '<strong>🚨 複数マッチ検出（危険）:</strong><br>';
-                matchHtml += `${result.alternatives.length}件の求人がマッチしました。安全性のため処理を停止しました。<br><br>`;
-                matchHtml += '<strong>マッチした求人:</strong><br>';
-                result.alternatives.forEach((alt, index) => {
-                    matchHtml += `${index + 1}. ${alt}<br>`;
-                });
-                matchHtml += '<br><small style="color: #721c24;">複数の求人にマッチする場合、間違った求人に応募する危険性があるため、手動で確認してください。</small>';
-                matchHtml += '</div>';
-            }
-            
-            // 警告の表示
-            if (result.warnings && result.warnings.length > 0) {
-                matchHtml += '<div class="result-item" style="background-color: #fff3cd; border-left-color: #ffc107;">';
-                matchHtml += '<strong>警告:</strong><br>';
-                result.warnings.forEach(warning => {
-                    matchHtml += `• ${warning}<br>`;
-                });
-                matchHtml += '</div>';
-            }
-            
             matchResultDiv.innerHTML = matchHtml;
             
             // 利用可能な募集職種
@@ -579,6 +604,144 @@
                 jobsHtml += '</div>';
                 availableJobsDiv.innerHTML = jobsHtml;
             }
+            
+            // フォーム解析結果の表示
+            console.log('フォーム解析結果:', result.formAnalysis);
+            displayFormAnalysis(result.formAnalysis);
+        }
+        
+        function displayFormAnalysis(formAnalysis) {
+            const formAnalysisDiv = document.getElementById('formAnalysis');
+            console.log('displayFormAnalysis呼び出し:', formAnalysis);
+            
+            if (!formAnalysis) {
+                formAnalysisDiv.innerHTML = '<div class="result-item">フォーム解析は実行されませんでした</div>';
+                return;
+            }
+            
+            if (!formAnalysis.success) {
+                formAnalysisDiv.innerHTML = `
+                    <div class="result-item no-match">
+                        <strong>フォーム解析失敗</strong><br>
+                        ${formAnalysis.error || '不明なエラー'}
+                    </div>`;
+                return;
+            }
+            
+            let formHtml = '';
+            
+            // 概要情報
+            formHtml += '<div class="result-item" style="background-color: #e3f2fd; border-left-color: #2196f3;">';
+            formHtml += '<strong>📋 フォーム解析概要</strong><br>';
+            if (formAnalysis.companyName) {
+                formHtml += `<strong>会社名:</strong> ${formAnalysis.companyName}<br>`;
+            }
+            formHtml += `<strong>求人:</strong> ${formAnalysis.jobName}<br>`;
+            formHtml += `<strong>解析時刻:</strong> ${new Date(formAnalysis.timestamp).toLocaleString('ja-JP')}<br>`;
+            if (formAnalysis.savedFile && formAnalysis.savedFile.success) {
+                formHtml += `<strong>保存ファイル:</strong> ${formAnalysis.savedFile.fileName}<br>`;
+            }
+            formHtml += '</div>';
+            
+            // 有効フィールドのみで統計を計算
+            const validFields = formAnalysis.fields ? formAnalysis.fields.filter(field => 
+                field.name !== 'Unknown Field' && field.name.trim() !== ''
+            ) : [];
+            
+            const validTotalFields = validFields.length;
+            const validRequiredFields = validFields.filter(field => field.required).length;
+            const validOptionalFields = validFields.filter(field => !field.required).length;
+            
+            // サマリー（有効フィールドのみ）
+            formHtml += '<div class="form-summary">';
+            formHtml += `
+                <div class="form-summary-item total">
+                    <strong>${validTotalFields}</strong><br>
+                    <small>有効項目数</small>
+                </div>
+                <div class="form-summary-item required">
+                    <strong>${validRequiredFields}</strong><br>
+                    <small>必須項目</small>
+                </div>
+                <div class="form-summary-item optional">
+                    <strong>${validOptionalFields}</strong><br>
+                    <small>任意項目</small>
+                </div>
+            `;
+            
+            if (validTotalFields > 0) {
+                const requiredPercentage = Math.round((validRequiredFields / validTotalFields) * 100);
+                formHtml += `
+                    <div class="form-summary-item">
+                        <strong>${requiredPercentage}%</strong><br>
+                        <small>必須項目率</small>
+                    </div>
+                `;
+            }
+            formHtml += '</div>';
+            
+            // 詳細テーブル（Unknown Fieldを除外）
+            if (formAnalysis.fields && formAnalysis.fields.length > 0) {
+                // Unknown Fieldを除外してフィルタリング
+                const validFields = formAnalysis.fields.filter(field => 
+                    field.name !== 'Unknown Field' && field.name.trim() !== ''
+                );
+                
+                if (validFields.length > 0) {
+                    formHtml += '<div class="result-item">';
+                    formHtml += `<strong>📝 項目詳細一覧 (${validFields.length}件の有効項目)</strong><br><br>`;
+                    formHtml += '<table class="form-analysis-table">';
+                    formHtml += `
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>項目名</th>
+                                <th>種類</th>
+                                <th>必須/任意</th>
+                                <th>検出方法</th>
+                                <th>詳細情報</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    
+                    validFields.forEach((field, index) => {
+                        const statusClass = field.required ? 'required' : 'optional';
+                        const statusText = field.required ? '🔴 必須' : '⚪ 任意';
+                        const statusBadge = field.required ? 
+                            '<span class="badge required-badge">必須</span>' : 
+                            '<span class="badge optional-badge">任意</span>';
+                        
+                        // 検出詳細情報
+                        let detailInfo = [];
+                        if (field.hasLabel) detailInfo.push('ラベル有');
+                        if (field.hasRequiredIndicator) detailInfo.push('必須表示有');
+                        if (field.hasOptionalIndicator) detailInfo.push('任意表示有');
+                        if (field.hasInput) detailInfo.push('入力欄有');
+                        
+                        formHtml += `
+                            <tr class="field-row ${statusClass}">
+                                <td>${index + 1}</td>
+                                <td><strong>${field.name}</strong></td>
+                                <td><span class="field-type">${field.type}</span></td>
+                                <td class="${statusClass}">
+                                    ${statusBadge}
+                                    <br><small>${statusText}</small>
+                                </td>
+                                <td><small>${field.detectionMethod}</small></td>
+                                <td><small>${detailInfo.join(', ')}</small></td>
+                            </tr>
+                        `;
+                    });
+                    
+                    formHtml += '</tbody></table>';
+                    formHtml += '</div>';
+                } else {
+                    formHtml += '<div class="result-item">有効なフォーム項目が検出されませんでした</div>';
+                }
+            }
+            
+            formAnalysisDiv.innerHTML = formHtml;
         }
 
         closeBtn.addEventListener('click', async () => {
@@ -662,6 +825,7 @@
         // 初期化
         addLog('求人照合RPAツール (安全性強化版) が起動しました');
         addLog('新しいJSON書式に対応しています');
+        addLog('フォーム解析機能が追加されました');
     </script>
 </body>
 </html>

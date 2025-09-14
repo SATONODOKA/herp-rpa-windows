@@ -359,6 +359,506 @@ function safeJobMatching(extractedName, availableJobs) {
     return ultraStrictJobMatching(extractedName, availableJobs);
 }
 
+// マッチした求人に対応する「この職種に推薦する」ボタンをクリックする関数
+async function clickRecommendationButton(page, targetJobName) {
+    const clickResult = {
+        success: false,
+        error: null,
+        targetJobName,
+        buttonFound: false,
+        clickAttempted: false,
+        details: {}
+    };
+
+    try {
+        sendLog(`対象求人「${targetJobName}」に対応するボタンを検索中...`);
+
+        // ページ内の全ての「この職種に推薦する」ボタンとその対応する求人名を取得
+        const buttonJobPairs = await page.evaluate(() => {
+            const pairs = [];
+            
+            // 「この職種に推薦する」ボタンを全て取得
+            const recommendationButtons = document.querySelectorAll('button');
+            const validButtons = Array.from(recommendationButtons).filter(btn => 
+                btn.textContent && btn.textContent.includes('この職種に推薦する')
+            );
+            
+            console.log(`推薦ボタンを${validButtons.length}個見つけました`);
+            
+            validButtons.forEach((button, index) => {
+                let currentElement = button;
+                let jobName = null;
+                let searchDepth = 0;
+                
+                // ボタンから上位要素を辿って対応する求人名を探す
+                while (currentElement && searchDepth < 15) {
+                    currentElement = currentElement.parentElement;
+                    if (!currentElement) break;
+                    searchDepth++;
+                    
+                    // 方法1: .agent-requisitions-table-list__cell.--name クラスを探す
+                    const nameCell = currentElement.querySelector('.agent-requisitions-table-list__cell.--name');
+                    if (nameCell) {
+                        const anchor = nameCell.querySelector('a');
+                        if (anchor && anchor.textContent) {
+                            jobName = anchor.textContent.trim();
+                            break;
+                        }
+                    }
+                    
+                    // 方法2: テーブル行の最初の列（td:first-child）を探す
+                    const firstCell = currentElement.querySelector('td:first-child');
+                    if (firstCell) {
+                        const anchor = firstCell.querySelector('a');
+                        if (anchor && anchor.textContent) {
+                            jobName = anchor.textContent.trim();
+                            break;
+                        }
+                        
+                        // アンカータグがない場合、直接テキストを取得
+                        const cellText = firstCell.textContent.trim();
+                        if (cellText && cellText.length > 2 && !cellText.includes('この職種に推薦する')) {
+                            jobName = cellText;
+                            break;
+                        }
+                    }
+                    
+                    // 方法3: 同じ行（tr）内の最初のセルを探す
+                    const row = currentElement.closest('tr');
+                    if (row) {
+                        const firstTd = row.querySelector('td:first-child');
+                        if (firstTd) {
+                            const anchor = firstTd.querySelector('a');
+                            if (anchor && anchor.textContent) {
+                                jobName = anchor.textContent.trim();
+                                break;
+                            }
+                            
+                            const cellText = firstTd.textContent.trim();
+                            if (cellText && cellText.length > 2 && !cellText.includes('この職種に推薦する')) {
+                                jobName = cellText;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (jobName) {
+                    pairs.push({
+                        jobName: jobName,
+                        buttonIndex: index,
+                        searchDepth: searchDepth,
+                        button: button
+                    });
+                    console.log(`ボタン${index}: "${jobName}" (検索深度: ${searchDepth})`);
+                } else {
+                    console.log(`ボタン${index}: 求人名が見つかりませんでした`);
+                }
+            });
+            
+            return pairs;
+        });
+
+        clickResult.details.foundPairs = buttonJobPairs.length;
+        clickResult.details.pairs = buttonJobPairs.map(pair => ({
+            jobName: pair.jobName,
+            buttonIndex: pair.buttonIndex,
+            searchDepth: pair.searchDepth
+        }));
+
+        sendLog(`${buttonJobPairs.length}個のボタン-求人ペアを検出しました`);
+        
+        // 対象求人名と完全一致するボタンを探す
+        const exactMatch = buttonJobPairs.find(pair => pair.jobName === targetJobName);
+        
+        if (exactMatch) {
+            clickResult.buttonFound = true;
+            sendLog(`完全一致するボタンを発見: "${exactMatch.jobName}" (ボタンインデックス: ${exactMatch.buttonIndex})`);
+            
+            // ボタンをクリック
+            const clickSuccess = await page.evaluate((buttonIndex) => {
+                const recommendationButtons = document.querySelectorAll('button');
+                const validButtons = Array.from(recommendationButtons).filter(btn => 
+                    btn.textContent && btn.textContent.includes('この職種に推薦する')
+                );
+                
+                if (validButtons[buttonIndex]) {
+                    try {
+                        validButtons[buttonIndex].click();
+                        return true;
+                    } catch (error) {
+                        console.error('ボタンクリックエラー:', error);
+                        return false;
+                    }
+                }
+                return false;
+            }, exactMatch.buttonIndex);
+            
+            clickResult.clickAttempted = true;
+            
+            if (clickSuccess) {
+                clickResult.success = true;
+                sendLog(`「${targetJobName}」の推薦ボタンクリックに成功しました`, 'success');
+                
+                // クリック後の確認（少し待機）
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+            } else {
+                clickResult.error = 'ボタンクリックの実行に失敗しました';
+                sendLog(`ボタンクリックの実行に失敗: ${targetJobName}`, 'error');
+            }
+            
+        } else {
+            // 完全一致しない場合は、正規化して再検索
+            const normalizedTarget = normalizeJobName(targetJobName);
+            const normalizedMatch = buttonJobPairs.find(pair => 
+                normalizeJobName(pair.jobName) === normalizedTarget
+            );
+            
+            if (normalizedMatch) {
+                clickResult.buttonFound = true;
+                sendLog(`正規化後一致するボタンを発見: "${normalizedMatch.jobName}" → "${targetJobName}"`);
+                
+                const clickSuccess = await page.evaluate((buttonIndex) => {
+                    const recommendationButtons = document.querySelectorAll('button');
+                    const validButtons = Array.from(recommendationButtons).filter(btn => 
+                        btn.textContent && btn.textContent.includes('この職種に推薦する')
+                    );
+                    
+                    if (validButtons[buttonIndex]) {
+                        try {
+                            validButtons[buttonIndex].click();
+                            return true;
+                        } catch (error) {
+                            console.error('ボタンクリックエラー:', error);
+                            return false;
+                        }
+                    }
+                    return false;
+                }, normalizedMatch.buttonIndex);
+                
+                clickResult.clickAttempted = true;
+                
+                if (clickSuccess) {
+                    clickResult.success = true;
+                    sendLog(`「${targetJobName}」の推薦ボタンクリック（正規化一致）に成功しました`, 'success');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else {
+                    clickResult.error = 'ボタンクリックの実行に失敗しました（正規化一致）';
+                    sendLog(`ボタンクリックの実行に失敗（正規化一致）: ${targetJobName}`, 'error');
+                }
+            } else {
+                clickResult.error = `対象求人「${targetJobName}」に対応するボタンが見つかりませんでした`;
+                sendLog(`対応するボタンが見つかりません: ${targetJobName}`, 'error');
+                sendLog(`利用可能な求人: ${buttonJobPairs.map(p => p.jobName).join(', ')}`);
+            }
+        }
+
+    } catch (error) {
+        clickResult.error = `ボタンクリック処理中にエラーが発生しました: ${error.message}`;
+        sendLog(`ボタンクリック処理エラー: ${error.message}`, 'error');
+    }
+
+    return clickResult;
+}
+
+// 推薦ページのフォーム項目を解析する関数
+async function analyzeRecommendationForm(page, jobName) {
+    const analysisResult = {
+        success: false,
+        error: null,
+        jobName: jobName,
+        timestamp: new Date().toISOString(),
+        totalFields: 0,
+        requiredFields: 0,
+        optionalFields: 0,
+        fields: [],
+        pageUrl: null,
+        companyName: null
+    };
+
+    try {
+        // 現在のページURLを取得
+        analysisResult.pageUrl = await page.url();
+        sendLog(`フォーム解析開始: ${analysisResult.pageUrl}`);
+
+        // ページ内のフォーム項目を解析
+        const formData = await page.evaluate(() => {
+            const fields = [];
+            let companyName = null;
+
+            // 会社名を取得（複数の方法で試行）
+            const companySelectors = [
+                'h1', 'h2', '.company-name', '[class*="company"]', 
+                '.title', '[class*="title"]'
+            ];
+            
+            for (const selector of companySelectors) {
+                const element = document.querySelector(selector);
+                if (element && element.textContent) {
+                    const text = element.textContent.trim();
+                    if (text.includes('株式会社') || text.includes('(株)') || text.includes('会社')) {
+                        companyName = text;
+                        break;
+                    }
+                }
+            }
+
+            // フォーム項目を検索
+            const formElements = document.querySelectorAll('input, textarea, select');
+            const labeledFormItems = document.querySelectorAll('.labeled-form-item, [class*="form-item"], [class*="field"]');
+
+            // 方法1: labeled-form-itemクラスを使用
+            labeledFormItems.forEach((item, index) => {
+                try {
+                    const labelElement = item.querySelector('[class*="label"]');
+                    const requiredElement = item.querySelector('[class*="required"], .required, [data-required="true"]');
+                    const optionalElement = item.querySelector('[class*="optional"], .optional, [data-optional="true"]');
+                    const inputElement = item.querySelector('input, textarea, select');
+                    
+                    // チェックボックス項目の場合、より広範囲で必須/任意マークを探す
+                    let additionalRequiredElement = null;
+                    let additionalOptionalElement = null;
+                    if (inputElement && inputElement.type === 'checkbox') {
+                        // 親要素や兄弟要素も含めて必須/任意マークを探す
+                        const parentElement = item.parentElement;
+                        if (parentElement) {
+                            additionalRequiredElement = parentElement.querySelector('[class*="required"], .required, span[style*="color: red"], span[style*="color:#red"]');
+                            additionalOptionalElement = parentElement.querySelector('[class*="optional"], .optional');
+                        }
+                    }
+
+                    let fieldName = 'Unknown Field';
+                    let isRequired = false;
+                    let fieldType = 'text';
+                    let detectionMethod = 'labeled-form-item';
+
+                    // ラベルテキストを取得
+                    if (labelElement) {
+                        fieldName = labelElement.textContent.trim();
+                        // 「*」や「必須」などの文字を除去
+                        fieldName = fieldName.replace(/[*＊]/g, '').replace(/必須|任意/g, '').trim();
+                    }
+
+                    // 必須/任意の判定（シンプルに要素の存在で判定）
+                    if (requiredElement || additionalRequiredElement) {
+                        // requiredElementが存在する場合は必須
+                        isRequired = true;
+                        detectionMethod += ' + required-element';
+                    } else if (optionalElement || additionalOptionalElement) {
+                        // optionalElementが存在する場合は任意
+                        isRequired = false;
+                        detectionMethod += ' + optional-element';
+                    } else {
+                        // テキスト内容による判定
+                        const itemText = item.textContent || '';
+                        const parentText = item.parentElement ? item.parentElement.textContent || '' : '';
+                        const allText = itemText + ' ' + parentText;
+                        
+                        if (allText.includes('必須') || allText.includes('*') || allText.includes('＊')) {
+                            isRequired = true;
+                            detectionMethod += ' + text-required';
+                        } else if (allText.includes('任意')) {
+                            isRequired = false;
+                            detectionMethod += ' + text-optional';
+                        } else {
+                            // 色による判定
+                            const computedStyle = window.getComputedStyle(labelElement || item);
+                            const color = computedStyle.color;
+                            const backgroundColor = computedStyle.backgroundColor;
+                            
+                            // 赤系の色は必須、灰色系は任意
+                            if (color.includes('rgb(255') || color.includes('red') || backgroundColor.includes('red')) {
+                                isRequired = true;
+                                detectionMethod += ' + red-color';
+                            } else if (color.includes('rgb(128') || color.includes('gray') || color.includes('grey')) {
+                                isRequired = false;
+                                detectionMethod += ' + gray-color';
+                            }
+                        }
+                    }
+
+                    // 入力タイプを取得
+                    if (inputElement) {
+                        fieldType = inputElement.type || inputElement.tagName.toLowerCase();
+                    }
+
+                    // Unknown Fieldと不要項目（1,2,20,22番目）を除外し、名前が取得できたフィールドのみを追加
+                    if (fieldName !== 'Unknown Field' && fieldName.trim() !== '' && 
+                        fieldName !== '推薦元' && fieldName !== '職種' &&
+                        fieldName !== '登録内容の確認' && fieldName !== '個人情報の取り扱いに同意します') {
+                        fields.push({
+                            index: index + 1,
+                            name: fieldName,
+                            type: fieldType,
+                            required: isRequired,
+                            detectionMethod: detectionMethod,
+                            hasLabel: !!labelElement,
+                            hasRequiredIndicator: !!requiredElement,
+                            hasOptionalIndicator: !!optionalElement,
+                            hasInput: !!inputElement
+                        });
+                    }
+
+                } catch (error) {
+                    console.error(`フィールド${index}の解析エラー:`, error);
+                }
+            });
+
+            // 方法2: 一般的なフォーム要素を直接検索（補完用）
+            if (fields.length === 0) {
+                formElements.forEach((element, index) => {
+                    try {
+                        let fieldName = 'Unknown Field';
+                        let isRequired = false;
+                        let detectionMethod = 'direct-form-element';
+
+                        // ラベルを探す
+                        const id = element.id;
+                        const name = element.name;
+                        let labelElement = null;
+
+                        if (id) {
+                            labelElement = document.querySelector(`label[for="${id}"]`);
+                        }
+                        
+                        if (!labelElement && name) {
+                            labelElement = document.querySelector(`label[for="${name}"]`);
+                        }
+
+                        if (!labelElement) {
+                            // 親要素からラベルを探す
+                            let parent = element.parentElement;
+                            for (let i = 0; i < 3 && parent; i++) {
+                                const label = parent.querySelector('label');
+                                if (label) {
+                                    labelElement = label;
+                                    break;
+                                }
+                                parent = parent.parentElement;
+                            }
+                        }
+
+                        if (labelElement) {
+                            fieldName = labelElement.textContent.trim();
+                            fieldName = fieldName.replace(/[*＊]/g, '').replace(/必須|任意/g, '').trim();
+                        } else if (element.placeholder) {
+                            fieldName = element.placeholder;
+                        } else if (name) {
+                            fieldName = name;
+                        }
+
+                        // 必須属性をチェック
+                        if (element.hasAttribute('required')) {
+                            isRequired = true;
+                            detectionMethod += ' + required-attribute';
+                        }
+
+                        fields.push({
+                            index: fields.length + 1,
+                            name: fieldName,
+                            type: element.type || element.tagName.toLowerCase(),
+                            required: isRequired,
+                            detectionMethod: detectionMethod,
+                            hasLabel: !!labelElement,
+                            hasRequiredIndicator: false,
+                            hasOptionalIndicator: false,
+                            hasInput: true
+                        });
+
+                    } catch (error) {
+                        console.error(`要素${index}の解析エラー:`, error);
+                    }
+                });
+            }
+
+            return {
+                fields: fields,
+                companyName: companyName,
+                totalElements: formElements.length,
+                labeledItems: labeledFormItems.length
+            };
+        });
+
+        analysisResult.fields = formData.fields;
+        analysisResult.companyName = formData.companyName;
+        analysisResult.totalFields = formData.fields.length;
+        analysisResult.requiredFields = formData.fields.filter(f => f.required).length;
+        analysisResult.optionalFields = formData.fields.filter(f => !f.required).length;
+
+        if (analysisResult.totalFields > 0) {
+            analysisResult.success = true;
+            sendLog(`フォーム解析成功: 合計${analysisResult.totalFields}項目（必須:${analysisResult.requiredFields}, 任意:${analysisResult.optionalFields}）`);
+        } else {
+            analysisResult.error = 'フォーム項目が見つかりませんでした';
+            sendLog('フォーム項目が検出されませんでした', 'warning');
+        }
+
+    } catch (error) {
+        analysisResult.error = `フォーム解析中にエラーが発生しました: ${error.message}`;
+        sendLog(`フォーム解析エラー: ${error.message}`, 'error');
+    }
+
+    return analysisResult;
+}
+
+// フォーム解析結果をファイルに保存する関数
+async function saveFormAnalysisToFile(analysisResult, jobName) {
+    try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const sanitizedJobName = jobName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+        const fileName = `form_analysis_${sanitizedJobName}_${timestamp}.json`;
+        const filePath = path.join(__dirname, 'form_analysis', fileName);
+
+        // ディレクトリが存在しない場合は作成
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // 保存用のデータを整理
+        const saveData = {
+            ...analysisResult,
+            analysis: {
+                summary: {
+                    totalFields: analysisResult.totalFields,
+                    requiredFields: analysisResult.requiredFields,
+                    optionalFields: analysisResult.optionalFields,
+                    requiredPercentage: analysisResult.totalFields > 0 ? 
+                        Math.round((analysisResult.requiredFields / analysisResult.totalFields) * 100) : 0
+                },
+                fieldsByType: analysisResult.fields.reduce((acc, field) => {
+                    acc[field.type] = (acc[field.type] || 0) + 1;
+                    return acc;
+                }, {}),
+                detectionMethods: analysisResult.fields.reduce((acc, field) => {
+                    acc[field.detectionMethod] = (acc[field.detectionMethod] || 0) + 1;
+                    return acc;
+                }, {})
+            }
+        };
+
+        fs.writeFileSync(filePath, JSON.stringify(saveData, null, 2), 'utf8');
+        
+        sendLog(`フォーム解析結果を保存しました: ${fileName}`, 'success');
+        
+        return {
+            fileName: fileName,
+            filePath: filePath,
+            success: true
+        };
+
+    } catch (error) {
+        sendLog(`ファイル保存エラー: ${error.message}`, 'error');
+        return {
+            fileName: null,
+            filePath: null,
+            success: false,
+            error: error.message
+        };
+    }
+}
+
 app.get('/events', (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -552,8 +1052,35 @@ app.post('/execute', async (req, res) => {
             });
         }
 
-        // 成功した場合
+        // 成功した場合 - ボタンクリック処理を追加
         sendLog(`${matchResult.matchType === 'exact' ? '完全' : '部分'}一致: ${inputJobName} → ${matchResult.matchedJob} (信頼度: ${matchResult.confidence}%)`, 'success');
+        
+        // マッチした求人に対応するボタンをクリック
+        sendLog('対応する「この職種に推薦する」ボタンを検索しています...');
+        
+        const clickResult = await clickRecommendationButton(page, matchResult.matchedJob);
+        
+        let formAnalysisResult = null;
+        
+        // ボタンクリックが成功した場合、フォーム解析を実行
+        if (clickResult.success) {
+            sendLog('推薦ページのフォーム項目を解析しています...', 'info');
+            
+            // ページ遷移を待機
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            formAnalysisResult = await analyzeRecommendationForm(page, matchResult.matchedJob);
+            
+            if (formAnalysisResult.success) {
+                sendLog(`フォーム解析完了: ${formAnalysisResult.totalFields}個の項目を検出`, 'success');
+                
+                // 結果をファイルに保存
+                const savedFile = await saveFormAnalysisToFile(formAnalysisResult, matchResult.matchedJob);
+                formAnalysisResult.savedFile = savedFile;
+            } else {
+                sendLog(`フォーム解析に失敗: ${formAnalysisResult.error}`, 'error');
+            }
+        }
         
         const result = {
             inputJobName,
@@ -562,10 +1089,20 @@ app.post('/execute', async (req, res) => {
             matchType: matchResult.matchType,
             confidence: matchResult.confidence,
             availableJobs: jobListings,
-            warnings: matchResult.warnings
+            warnings: matchResult.warnings,
+            buttonClicked: clickResult.success,
+            clickDetails: clickResult,
+            formAnalysis: formAnalysisResult
         };
         
         sendEvent({ type: 'result', result });
+        
+        if (clickResult.success) {
+            sendLog('「この職種に推薦する」ボタンのクリックが完了しました', 'success');
+        } else {
+            sendLog(`ボタンクリックに失敗しました: ${clickResult.error}`, 'error');
+        }
+        
         sendLog('判定処理が完了しました', 'success');
         sendEvent({ type: 'complete' });
         

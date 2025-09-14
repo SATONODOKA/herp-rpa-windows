@@ -1,16 +1,16 @@
 {
-  "recommendation_no_raw": "20250911-TEST2",
+  "recommendation_no_raw": "20250911-PM001",
   "kintone": {
     "source": "kintone",
     "fetched_at": "2025-09-11T12:30:00+09:00",
     "record": {
       "ats_type_1_raw": "HERP",
       "browser_name_1_raw": "シークレットモード",
-      "company_name_raw": "（株）テストカンパニー",
+      "company_name_raw": "（株）テックイノベーション",
       "ats_url_1_raw": "https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw",
       "ats_id_1_raw": null,
       "ats_pw_1_raw": null,
-      "notes_1_raw": "・微妙に一致しないパターンのテスト",
+      "notes_1_raw": "・プロジェクトマネージャー職種のテスト",
       "ats_input_type_1_raw": "企業必須項目のみ＋PDF",
       "ats_input_language_1_raw": "すべて日本語",
       "pdf_processing_required_raw": "加工なし"
@@ -20,10 +20,10 @@
     "source": "calib",
     "fetched_at": "2025-09-11T12:30:00+09:00",
     "record": {
-      "ra_memo_raw": "W送付【シニア】フロントエンドエンジニア（React/TypeScript専門）【正社員】※現年収:700万円、希望年収:800万円、最低希望年収:750万円",
+      "ra_memo_raw": "W送付プロジェクトマネージャー※現年収:800万円、希望年収:900万円、最低希望年収:850万円",
       "pdf_export": {
         "performed_raw": true,
-        "file_path": "/downloads/calib/20250911-TEST2.pdf"
+        "file_path": "/downloads/calib/20250911-PM001.pdf"
       }
     }
   }

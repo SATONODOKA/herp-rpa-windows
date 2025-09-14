@@ -1,0 +1,275 @@
+{
+  "success": true,
+  "error": null,
+  "jobName": "プロジェクトマネージャー",
+  "timestamp": "2025-09-14T02:52:30.564Z",
+  "totalFields": 22,
+  "requiredFields": 0,
+  "optionalFields": 22,
+  "fields": [
+    {
+      "index": 1,
+      "name": "推薦元",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": false,
+      "hasInput": false
+    },
+    {
+      "index": 5,
+      "name": "職種",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": false,
+      "hasInput": false
+    },
+    {
+      "index": 9,
+      "name": "応募者氏名",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + required-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": true,
+      "hasOptionalIndicator": false,
+      "hasInput": true
+    },
+    {
+      "index": 16,
+      "name": "現所属",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 23,
+      "name": "年齢",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 30,
+      "name": "最終学歴",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 37,
+      "name": "電話番号",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 44,
+      "name": "メールアドレス",
+      "type": "email",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 51,
+      "name": "推薦時コメント",
+      "type": "textarea",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 58,
+      "name": "履歴書",
+      "type": "file",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 62,
+      "name": "職務経歴書",
+      "type": "file",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 66,
+      "name": "その他のファイル",
+      "type": "file",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 70,
+      "name": "経歴",
+      "type": "textarea",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 77,
+      "name": "リンク",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 87,
+      "name": "現年収",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 94,
+      "name": "希望年収",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 101,
+      "name": "希望年収（最低）",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 108,
+      "name": "その他希望条件",
+      "type": "textarea",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 115,
+      "name": "登録内容の確認",
+      "type": "checkbox",
+      "required": false,
+      "detectionMethod": "labeled-form-item + required-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": true,
+      "hasOptionalIndicator": false,
+      "hasInput": true
+    },
+    {
+      "index": 118,
+      "name": "登録内容に誤りはありません",
+      "type": "checkbox",
+      "required": false,
+      "detectionMethod": "labeled-form-item",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": false,
+      "hasInput": true
+    },
+    {
+      "index": 119,
+      "name": "エージェント様の個人情報の取り扱いについて",
+      "type": "checkbox",
+      "required": false,
+      "detectionMethod": "labeled-form-item + required-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": true,
+      "hasOptionalIndicator": false,
+      "hasInput": true
+    },
+    {
+      "index": 122,
+      "name": "個人情報の取り扱いに同意します",
+      "type": "checkbox",
+      "required": false,
+      "detectionMethod": "labeled-form-item",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": false,
+      "hasInput": true
+    }
+  ],
+  "pageUrl": "https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw/requisitions/id/52dc328e-a108-4e08-9d9d-af64e5827545/candidacies/add",
+  "companyName": "株式会社リクルート プロジェクトマネージャーに推薦する",
+  "analysis": {
+    "summary": {
+      "totalFields": 22,
+      "requiredFields": 0,
+      "optionalFields": 22,
+      "requiredPercentage": 0
+    },
+    "fieldsByType": {
+      "text": 11,
+      "email": 1,
+      "textarea": 3,
+      "file": 3,
+      "checkbox": 4
+    },
+    "detectionMethods": {
+      "labeled-form-item": 4,
+      "labeled-form-item + required-element": 3,
+      "labeled-form-item + optional-element": 15
+    }
+  }
+}
