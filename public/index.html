@@ -490,6 +490,19 @@
             </div>
         </div>
         
+        <!-- HERPに登録するボタンを追加 -->
+        <div class="result-section" id="herpRegistrationSection" style="display: none;">
+            <h3>🚀 HERPへの自動転記</h3>
+            <div class="result-item" style="background-color: #e8f5e8; border-left-color: #28a745;">
+                <p><strong>自動転記機能</strong></p>
+                <p>解析結果をHERPフォームに自動転記します。必須項目のみが転記され、履歴書PDFも自動でアップロードされます。</p>
+                <button id="registerToHerpBtn" style="background-color: #28a745; font-size: 18px; padding: 15px 30px; margin-top: 10px;">
+                    📝 HERPに登録する
+                </button>
+                <div id="herpRegistrationStatus" style="margin-top: 10px; display: none;"></div>
+            </div>
+        </div>
+        
         <div class="log" id="log"></div>
     </div>
 
@@ -783,6 +796,27 @@
             }
             
             // フォーム自動入力機能は削除（HERPサイトへの直接入力は行わない）
+
+            // HERP登録セクションを表示し、enhanced JSONデータを保存
+            if (result.formAnalysis && result.formAnalysis.enhancedJson && result.formAnalysis.enhancedJson.success) {
+                latestEnhancedData = result.formAnalysis.enhancedJson.data;
+                latestPdfFile = uploadedPdf; // アップロードされたPDFファイルを保存
+                
+                const herpSection = document.getElementById('herpRegistrationSection');
+                herpSection.style.display = 'block';
+                
+                // enhanced JSONファイルの詳細を表示
+                const herpStatusDiv = document.getElementById('herpRegistrationStatus');
+                herpStatusDiv.innerHTML = `
+                    <div class="result-item" style="background-color: #f0f8ff; border-left-color: #007bff;">
+                        <strong>📊 転記準備完了</strong><br>
+                        <small>Enhanced JSON: ${result.formAnalysis.enhancedJson.fileName}</small><br>
+                        <small>転記可能項目: ${Object.keys(latestEnhancedData.formData).length}個</small><br>
+                        <small>履歴書PDF: ${uploadedPdf.name}</small>
+                    </div>
+                `;
+                herpStatusDiv.style.display = 'block';
+            }
         }
         
         function displayFormAnalysis(formAnalysis) {
@@ -1141,6 +1175,74 @@
         }
 
         // フォーム自動入力機能は削除（HERPサイトへの直接入力は行わない）
+
+        // HERP登録機能の変数
+        let latestEnhancedData = null;
+        let latestPdfFile = null;
+
+        // HERP登録ボタンのイベントリスナー
+        document.getElementById('registerToHerpBtn').addEventListener('click', async () => {
+            if (!latestEnhancedData) {
+                updateHerpRegistrationStatus('解析結果が見つかりません。先に実行ボタンを押してください。', 'error');
+                return;
+            }
+
+            if (!latestPdfFile) {
+                updateHerpRegistrationStatus('履歴書PDFファイルが見つかりません。', 'error');
+                return;
+            }
+
+            const registerBtn = document.getElementById('registerToHerpBtn');
+            registerBtn.disabled = true;
+            registerBtn.textContent = '🔄 転記中...';
+
+            try {
+                updateHerpRegistrationStatus('HERPフォームへの自動転記を開始しています...', 'info');
+
+                // FormDataを作成
+                const formData = new FormData();
+                formData.append('enhancedData', JSON.stringify(latestEnhancedData));
+                formData.append('pdfFile', latestPdfFile);
+
+                const response = await fetch('/herp-register', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                // レスポンスのContent-Typeを確認
+                const contentType = response.headers.get('content-type');
+                let result;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    // JSONでない場合はテキストとして取得
+                    const textResponse = await response.text();
+                    updateHerpRegistrationStatus(`❌ サーバーエラー: 不正なレスポンス形式 (HTML/テキストが返されました)`, 'error');
+                    console.error('非JSONレスポンス:', textResponse);
+                    return;
+                }
+
+                if (response.ok) {
+                    updateHerpRegistrationStatus(`✅ HERPへの転記が完了しました！ (${result.filledFields}個の項目を転記)`, 'success');
+                } else {
+                    const errorMsg = result.error || result.details || '不明なエラー';
+                    updateHerpRegistrationStatus(`❌ 転記エラー: ${errorMsg}`, 'error');
+                }
+            } catch (error) {
+                updateHerpRegistrationStatus(`❌ 通信エラー: ${error.message}`, 'error');
+            } finally {
+                registerBtn.disabled = false;
+                registerBtn.textContent = '📝 HERPに登録する';
+            }
+        });
+
+        function updateHerpRegistrationStatus(message, type) {
+            const statusDiv = document.getElementById('herpRegistrationStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
 
         // 初期化
         addLog('求人照合RPAツール (PDF統合版) が起動しました');

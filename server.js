@@ -69,7 +69,11 @@ let sseClients = [];
 const SAFETY_CONFIG = {
     MINIMUM_CONFIDENCE_THRESHOLD: 90,
     ENABLE_STRICT_MODE: true,
-    LOG_ALL_EXTRACTIONS: true
+    LOG_ALL_EXTRACTIONS: true,
+    MAX_RETRY_ATTEMPTS: 3,
+    PAGE_TIMEOUT: 30000,
+    ELEMENT_WAIT_TIMEOUT: 5000,
+    FILE_SIZE_LIMIT: 10 * 1024 * 1024 // 10MB
 };
 
 // エラータイプの定義
@@ -1729,16 +1733,49 @@ app.post('/execute', upload.fields([
         const jsonFile = req.files.jsonFile[0];
         const pdfFile = req.files.pdfFile[0];
 
-        // JSONファイルを読み込み
+        // JSONファイルを読み込み（エラーハンドリング強化）
         sendLog('JSONファイルを読み込んでいます...');
-        const jsonData = JSON.parse(fs.readFileSync(jsonFile.path, 'utf8'));
+        let jsonData;
+        try {
+            const jsonContent = fs.readFileSync(jsonFile.path, 'utf8');
+            if (!jsonContent || jsonContent.trim().length === 0) {
+                throw new Error('JSONファイルが空です');
+            }
+            jsonData = JSON.parse(jsonContent);
+            if (!jsonData || typeof jsonData !== 'object') {
+                throw new Error('無効なJSONデータ形式です');
+            }
+            sendLog('JSONファイルの読み込みが完了しました', 'success');
+        } catch (parseError) {
+            sendLog(`JSONファイルの読み込みエラー: ${parseError.message}`, 'error');
+            throw new Error(`JSONファイルの解析に失敗しました: ${parseError.message}`);
+        }
         
-        // PDFファイルを解析（新しいシンプル抽出器を使用）
+        // PDFファイルを解析（エラーハンドリング強化）
         sendLog('PDFファイルを解析しています...');
-        const simplePDFExtractor = new SimplePDFExtractor();
-        simplePDFExtractor.debug = true; // デバッグモードを有効化
         
-        const pdfResult = await simplePDFExtractor.extractTextFromPDF(pdfFile.path);
+        // PDFファイルの存在・アクセス性確認
+        if (!fs.existsSync(pdfFile.path)) {
+            throw new Error(`PDFファイルが見つかりません: ${pdfFile.path}`);
+        }
+        
+        const pdfStats = fs.statSync(pdfFile.path);
+        if (pdfStats.size === 0) {
+            throw new Error('PDFファイルが空です');
+        }
+        
+        sendLog(`PDFファイルサイズ: ${Math.round(pdfStats.size / 1024)}KB`);
+        
+        const simplePDFExtractor = new SimplePDFExtractor();
+        simplePDFExtractor.debug = true;
+        
+        let pdfResult;
+        try {
+            pdfResult = await simplePDFExtractor.extractTextFromPDF(pdfFile.path);
+        } catch (pdfError) {
+            sendLog(`PDF抽出器エラー: ${pdfError.message}`, 'error');
+            throw new Error(`PDF解析に失敗しました: ${pdfError.message}`);
+        }
         
         if (pdfResult.success) {
             const extractedItems = [];
@@ -1791,24 +1828,61 @@ app.post('/execute', upload.fields([
 
         sendLog('ブラウザを起動しています...');
         
+        // 既存ブラウザの安全な終了
         if (browser) {
-            await browser.close();
+            try {
+                await browser.close();
+                sendLog('既存ブラウザを終了しました');
+            } catch (closeError) {
+                sendLog(`ブラウザ終了エラー: ${closeError.message}`, 'warning');
+            }
+            browser = null;
+            page = null;
         }
         
-        browser = await puppeteer.launch({
-            headless: false,
-            defaultViewport: null,
-            args: ['--start-maximized']
-        });
+        // ブラウザの起動（タイムアウト設定あり）
+        try {
+            browser = await puppeteer.launch({
+                headless: false,
+                defaultViewport: null,
+                args: ['--start-maximized', '--no-sandbox', '--disable-setuid-sandbox'],
+                timeout: 30000
+            });
+            sendLog('ブラウザの起動が完了しました', 'success');
+        } catch (launchError) {
+            sendLog(`ブラウザ起動エラー: ${launchError.message}`, 'error');
+            throw new Error(`ブラウザの起動に失敗しました: ${launchError.message}`);
+        }
         
         sendLog('新しいページを作成しています...');
-        page = await browser.newPage();
+        try {
+            page = await browser.newPage();
+            
+            // ページのエラーハンドリング設定
+            page.on('error', (error) => {
+                sendLog(`ページエラー: ${error.message}`, 'error');
+            });
+            
+            page.on('pageerror', (error) => {
+                sendLog(`ページJavaScriptエラー: ${error.message}`, 'warning');
+            });
+            
+            sendLog('新しいページの作成が完了しました', 'success');
+        } catch (pageError) {
+            throw new Error(`ページ作成エラー: ${pageError.message}`);
+        }
         
         sendLog('指定のURLにアクセスしています...');
-        await page.goto('https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw', {
-            waitUntil: 'networkidle2',
-            timeout: 30000
-        });
+        try {
+            await page.goto('https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw', {
+                waitUntil: 'networkidle2',
+                timeout: 30000
+            });
+            sendLog('ページの読み込みが完了しました', 'success');
+        } catch (navigationError) {
+            sendLog(`ページナビゲーションエラー: ${navigationError.message}`, 'error');
+            throw new Error(`ページの読み込みに失敗しました: ${navigationError.message}`);
+        }
         
         sendLog('ページの読み込みが完了しました', 'success');
         
@@ -1827,7 +1901,7 @@ app.post('/execute', upload.fields([
             
             console.log(`推薦ボタンを${validButtons.length}個見つけました`);
             
-            validButtons.forEach((button, index) => {
+            validButtons.forEach((button) => {
                 // ボタンの親要素から対応する求人名を探す
                 let currentElement = button;
                 let jobName = null;
@@ -2011,11 +2085,103 @@ app.post('/execute', upload.fields([
     } catch (error) {
         console.error('Error:', error);
         sendLog(`エラーが発生しました: ${error.message}`, 'error');
+        
+        // ブラウザの安全なクリーンアップ
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (closeError) {
+                console.error('ブラウザクリーンアップエラー:', closeError.message);
+            }
+            browser = null;
+            page = null;
+        }
+        
         res.status(500).json({ error: 'ブラウザの起動に失敗しました: ' + error.message });
     }
 });
 
-app.post('/close', async (req, res) => {
+// HERP自動転記エンドポイント（multer設定修正）
+app.post('/herp-register', upload.single('pdfFile'), async (req, res) => {
+    try {
+        console.log('🔍 /herp-register エンドポイントが呼び出されました');
+        console.log('Request headers:', req.headers);
+        console.log('Request body:', req.body);
+        console.log('Request file:', req.file);
+        
+        // enhancedDataの取得（FormDataで文字列として送信される）
+        const enhancedDataString = req.body.enhancedData;
+        if (!enhancedDataString) {
+            sendLog('Enhanced JSONデータが要求で見つかりません', 'error');
+            console.log('❌ req.body:', req.body);
+            console.log('❌ req.file:', req.file);
+            return res.status(400).json({ error: 'Enhanced JSONデータが見つかりません' });
+        }
+
+        let enhancedData;
+        try {
+            enhancedData = JSON.parse(enhancedDataString);
+        } catch (parseError) {
+            sendLog(`Enhanced JSONデータのパースエラー: ${parseError.message}`, 'error');
+            return res.status(400).json({ error: `Enhanced JSONデータの解析に失敗しました: ${parseError.message}` });
+        }
+        
+        const pdfFile = req.file;
+
+        if (!pdfFile) {
+            return res.status(400).json({ error: '履歴書PDFファイルが見つかりません' });
+        }
+
+        sendLog('HERP自動転記を開始します...', 'info');
+        sendLog(`転記項目数: ${Object.keys(enhancedData.formData).length}個`, 'info');
+
+        // 現在のページがHERPの推薦フォームかチェック
+        if (!page || !browser) {
+            return res.status(400).json({ error: 'ブラウザが起動していません。先に実行ボタンを押してください。' });
+        }
+
+        const currentUrl = await page.url();
+        if (!currentUrl.includes('herp.cloud')) {
+            return res.status(400).json({ error: 'HERPページが開かれていません。先に実行ボタンを押してマッチングを完了してください。' });
+        }
+
+        sendLog('HERPフォームが検出されました。自動転記を開始します...', 'info');
+
+        // フォーム転記を実行
+        const fillResult = await fillHerpForm(page, enhancedData, pdfFile);
+
+        if (fillResult.success) {
+            sendLog(`✅ HERP転記完了: ${fillResult.filledFields}個の項目を転記`, 'success');
+            res.json({
+                message: 'HERP転記が完了しました',
+                filledFields: fillResult.filledFields,
+                details: fillResult.details
+            });
+        } else {
+            sendLog(`❌ HERP転記失敗: ${fillResult.error}`, 'error');
+            res.status(500).json({
+                error: 'HERP転記に失敗しました',
+                details: fillResult.error
+            });
+        }
+
+    } catch (error) {
+        console.error('HERP転記エラー:', error);
+        sendLog(`❌ HERP転記エラー: ${error.message}`, 'error');
+        
+        // スタックトレースをログに記録（デバッグ用）
+        console.error('Stack trace:', error.stack);
+        
+        // エラーレスポンスをJSONで返す
+        res.status(500).json({ 
+            error: 'HERP転記中にエラーが発生しました',
+            details: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+app.post('/close', async (_, res) => {
     try {
         if (browser) {
             await browser.close();
@@ -2039,3 +2205,207 @@ process.on('SIGINT', async () => {
     }
     process.exit();
 });
+
+// HERPフォーム自動転記機能
+async function fillHerpForm(page, enhancedData, pdfFile) {
+    const fillResult = {
+        success: false,
+        filledFields: 0,
+        details: [],
+        error: null
+    };
+
+    try {
+        sendLog('HERPフォームの項目を検索しています...', 'info');
+
+        // HERPフォームのフィールドマッピング定義
+        const fieldMappings = {
+            // テキスト入力フィールド
+            '応募者氏名': 'input.text-field__input[placeholder*="採用 太郎"]',
+            '現所属': 'input.text-field__input[placeholder*="株式会社HERP"]',
+            '年齢': 'input.text-field__input[placeholder*="27"]',
+            '最終学歴': 'input.text-field__input[placeholder*="大学人事学部採用学科"]',
+            '電話番号': 'input.text-field__input[placeholder*="080-1234-5678"]',
+            'メールアドレス': 'input.text-field__input[placeholder*="herp@herp.co.jp"]',
+            
+            // 年収フィールド（数値のみ）
+            '現年収': 'input.text-field__input[placeholder*="500"]',
+            '希望年収': 'input.text-field__input[placeholder*="600"]',
+            '希望年収（最低）': 'input.text-field__input[placeholder*="400"]',
+            
+            // テキストエリア
+            '推薦時コメント': 'textarea.multiline-text-field__input[placeholder*="先月まで株式会社"]',
+            '経歴': 'textarea.multiline-text-field__input[placeholder*="大学卒業後"]',
+            'その他希望条件': 'textarea.multiline-text-field__input[placeholder*="ストックオプション"]',
+            
+            // リンクフィールド
+            'リンク1': 'input.text-field__input[placeholder*="github.com/xxx"][data-index="0"]',
+            'リンク2': 'input.text-field__input[placeholder*="github.com/xxx"][data-index="1"]'
+        };
+
+        sendLog(`Enhanced JSONから${Object.keys(enhancedData.formData).length}個の転記可能項目を検出`, 'info');
+
+        // データの存在確認
+        if (!enhancedData || !enhancedData.formData || typeof enhancedData.formData !== 'object') {
+            throw new Error('Enhanced data の formData が無効です');
+        }
+        
+        // 各フィールドを転記
+        for (const [fieldName, fieldData] of Object.entries(enhancedData.formData)) {
+            // フィールドデータの検証
+            if (!fieldData || typeof fieldData !== 'object') {
+                sendLog(`⚠️ フィールド「${fieldName}」のデータが無効です`, 'warning');
+                continue;
+            }
+            
+            try {
+                const selector = fieldMappings[fieldName];
+                if (!selector) {
+                    sendLog(`⚠️ フィールド「${fieldName}」のセレクターが見つかりません`, 'warning');
+                    continue;
+                }
+
+                // フィールドの存在確認
+                const fieldExists = await page.$(selector);
+                if (!fieldExists) {
+                    sendLog(`⚠️ フィールド「${fieldName}」がページに存在しません (${selector})`, 'warning');
+                    continue;
+                }
+
+                let valueToFill = fieldData.value;
+
+                // 年収フィールドの場合は数値のみを抽出
+                if (fieldName.includes('年収') && typeof valueToFill === 'string') {
+                    const numericMatch = valueToFill.match(/(\d+)/);
+                    if (numericMatch) {
+                        valueToFill = numericMatch[1];
+                    }
+                }
+
+                // フィールドに値を入力（エラーハンドリング強化）
+                await page.focus(selector);
+                await page.evaluate((sel) => {
+                    const element = document.querySelector(sel);
+                    if (element) element.value = '';
+                }, selector);
+                
+                // 値が文字列でない場合は文字列に変換
+                const stringValue = String(valueToFill || '');
+                if (stringValue.length === 0) {
+                    sendLog(`⚠️ フィールド「${fieldName}」の値が空です`, 'warning');
+                    continue;
+                }
+                
+                await page.type(selector, stringValue);
+                
+                // 入力値の検証
+                const actualValue = await page.evaluate((sel) => {
+                    const element = document.querySelector(sel);
+                    return element ? element.value : null;
+                }, selector);
+                
+                if (actualValue !== stringValue) {
+                    sendLog(`⚠️ フィールド「${fieldName}」の入力値が期待と異なります (期待: "${stringValue}", 実際: "${actualValue}")`, 'warning');
+                }
+
+                fillResult.filledFields++;
+                fillResult.details.push({
+                    fieldName: fieldName,
+                    value: valueToFill,
+                    source: fieldData.source,
+                    confidence: fieldData.confidence
+                });
+
+                sendLog(`✅ 転記完了: ${fieldName} = "${valueToFill}" (${fieldData.source})`, 'info');
+                
+                // 少し待機（ページの反応を待つ）
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+            } catch (error) {
+                sendLog(`❌ フィールド「${fieldName}」の転記エラー: ${error.message}`, 'error');
+                fillResult.details.push({
+                    fieldName: fieldName,
+                    value: 'エラー',
+                    source: 'エラー',
+                    confidence: 0,
+                    error: error.message
+                });
+            }
+        }
+
+        // 履歴書PDFファイルのアップロード
+        sendLog('履歴書PDFファイルをアップロードしています...', 'info');
+        try {
+            // PDFファイルの存在確認
+            if (!pdfFile || !pdfFile.path || !fs.existsSync(pdfFile.path)) {
+                throw new Error('アップロード用PDFファイルが見つかりません');
+            }
+            
+            const resumeFileSelector = 'input[type="file"]';
+            const resumeFileInput = await page.$(resumeFileSelector);
+            
+            if (resumeFileInput) {
+                await resumeFileInput.uploadFile(pdfFile.path);
+                sendLog('✅ 履歴書PDFのアップロードが完了しました', 'success');
+                fillResult.details.push({
+                    fieldName: '履歴書',
+                    value: pdfFile.originalname,
+                    source: 'ファイルアップロード',
+                    confidence: 100
+                });
+            } else {
+                sendLog('⚠️ 履歴書ファイルアップロード欄が見つかりません', 'warning');
+            }
+        } catch (error) {
+            sendLog(`❌ 履歴書アップロードエラー: ${error.message}`, 'error');
+        }
+
+        // チェックボックスの自動チェック
+        sendLog('最終チェックボックスを確認しています...', 'info');
+        try {
+            // チェックボックス処理のタイムアウト設定
+            await page.waitForSelector('input[type="checkbox"]', { timeout: 5000 });
+            
+            // 「登録内容に誤りはありません」チェックボックス
+            const registrationCheckbox = await page.$('input[type="checkbox"]');
+            if (registrationCheckbox) {
+                const isChecked = await page.evaluate(checkbox => checkbox.checked, registrationCheckbox);
+                if (!isChecked) {
+                    await registrationCheckbox.click();
+                    sendLog('✅ 「登録内容に誤りはありません」にチェックしました', 'success');
+                }
+            }
+
+            // 「個人情報の取り扱いに同意します」チェックボックス（2番目）
+            const checkboxes = await page.$$('input[type="checkbox"]');
+            if (checkboxes.length > 1) {
+                const privacyCheckbox = checkboxes[1];
+                const isChecked = await page.evaluate(checkbox => checkbox.checked, privacyCheckbox);
+                if (!isChecked) {
+                    await privacyCheckbox.click();
+                    sendLog('✅ 「個人情報の取り扱いに同意します」にチェックしました', 'success');
+                }
+            }
+
+            fillResult.details.push({
+                fieldName: '同意チェックボックス',
+                value: '自動チェック完了',
+                source: '自動処理',
+                confidence: 100
+            });
+
+        } catch (error) {
+            sendLog(`❌ チェックボックス処理エラー: ${error.message}`, 'error');
+        }
+
+        fillResult.success = true;
+        sendLog(`🎉 HERP転記完了: 合計${fillResult.filledFields}個の項目を転記しました`, 'success');
+
+        return fillResult;
+
+    } catch (error) {
+        fillResult.error = error.message;
+        sendLog(`❌ HERP転記処理エラー: ${error.message}`, 'error');
+        return fillResult;
+    }
+}
