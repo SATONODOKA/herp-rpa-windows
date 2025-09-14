@@ -2360,42 +2360,339 @@ async function fillHerpForm(page, enhancedData, pdfFile) {
             sendLog(`❌ 履歴書アップロードエラー: ${error.message}`, 'error');
         }
 
-        // チェックボックスの自動チェック
+        // チェックボックスの自動チェック（改善版）
         sendLog('最終チェックボックスを確認しています...', 'info');
         try {
-            // チェックボックス処理のタイムアウト設定
-            await page.waitForSelector('input[type="checkbox"]', { timeout: 5000 });
+            // ページ内の全チェックボックスを詳細に解析
+            await page.waitForSelector('input[type="checkbox"]', { timeout: 8000 });
             
-            // 「登録内容に誤りはありません」チェックボックス
-            const registrationCheckbox = await page.$('input[type="checkbox"]');
-            if (registrationCheckbox) {
-                const isChecked = await page.evaluate(checkbox => checkbox.checked, registrationCheckbox);
-                if (!isChecked) {
-                    await registrationCheckbox.click();
-                    sendLog('✅ 「登録内容に誤りはありません」にチェックしました', 'success');
+            const checkboxAnalysis = await page.evaluate(() => {
+                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                const results = [];
+                
+                checkboxes.forEach((checkbox, index) => {
+                    const parentLabel = checkbox.closest('label');
+                    const siblingSpan = checkbox.parentElement ? checkbox.parentElement.querySelector('span') : null;
+                    
+                    let labelText = '';
+                    
+                    // ラベルテキストを様々な方法で取得
+                    if (parentLabel) {
+                        labelText = parentLabel.textContent || parentLabel.innerText || '';
+                    } else if (siblingSpan) {
+                        labelText = siblingSpan.textContent || siblingSpan.innerText || '';
+                    } else {
+                        // 親要素や兄弟要素から探す
+                        let currentElement = checkbox.parentElement;
+                        let searchDepth = 0;
+                        while (currentElement && searchDepth < 5) {
+                            const textNodes = currentElement.querySelectorAll('span, div, label');
+                            for (let node of textNodes) {
+                                const text = node.textContent || node.innerText || '';
+                                if (text.includes('登録内容') || text.includes('個人情報') || text.includes('同意')) {
+                                    labelText = text;
+                                    break;
+                                }
+                            }
+                            if (labelText) break;
+                            currentElement = currentElement.parentElement;
+                            searchDepth++;
+                        }
+                    }
+                    
+                    results.push({
+                        index: index,
+                        checked: checkbox.checked,
+                        labelText: labelText.trim(),
+                        id: checkbox.id || '',
+                        className: checkbox.className || '',
+                        isRegistration: labelText.includes('登録内容') || labelText.includes('誤り'),
+                        isPrivacy: labelText.includes('個人情報') || labelText.includes('同意')
+                    });
+                });
+                
+                return results;
+            });
+            
+            sendLog(`🔍 チェックボックス解析結果: ${checkboxAnalysis.length}個検出`, 'info');
+            checkboxAnalysis.forEach((cb, i) => {
+                sendLog(`  [${i}] ${cb.labelText} (現在: ${cb.checked ? 'チェック済' : '未チェック'})`, 'info');
+            });
+            
+            // 「登録内容に誤りはありません」チェックボックスを探してチェック
+            const registrationCheckboxIndex = checkboxAnalysis.findIndex(cb => cb.isRegistration);
+            if (registrationCheckboxIndex !== -1) {
+                const registrationCb = checkboxAnalysis[registrationCheckboxIndex];
+                if (!registrationCb.checked) {
+                    try {
+                        // 方法1: Puppeteerのclick()メソッドを使用
+                        const checkboxes = await page.$$('input[type="checkbox"]');
+                        if (checkboxes[registrationCheckboxIndex]) {
+                            await checkboxes[registrationCheckboxIndex].click();
+                            sendLog(`🎯 登録内容チェックボックスをPuppeteerクリックで処理`, 'info');
+                        } else {
+                            throw new Error('チェックボックスが見つかりません');
+                        }
+                    } catch (puppeteerError) {
+                        sendLog(`⚠️ Puppeteerクリック失敗: ${puppeteerError.message}`, 'warning');
+                        
+                        // 方法2: 高度なチェックボックス操作
+                        try {
+                            const clickSuccess = await page.evaluate((index) => {
+                                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                                const checkbox = checkboxes[index];
+                                if (!checkbox) return { success: false, method: 'element-not-found' };
+                                
+                                console.log(`チェックボックス解析: ID=${checkbox.id}, class=${checkbox.className}`);
+                                
+                                // 方法A: ラベルを探してクリック
+                                const label = checkbox.closest('label') || document.querySelector(`label[for="${checkbox.id}"]`);
+                                if (label) {
+                                    console.log('ラベルをクリック中');
+                                    label.click();
+                                    if (checkbox.checked) return { success: true, method: 'label-click' };
+                                }
+                                
+                                // 方法B: span.checkbox__labelを探してクリック（HERPの構造対応）
+                                const spanLabel = checkbox.parentElement ? checkbox.parentElement.querySelector('span.checkbox__label') : null;
+                                if (spanLabel) {
+                                    console.log('span.checkbox__labelをクリック中');
+                                    spanLabel.click();
+                                    if (checkbox.checked) return { success: true, method: 'span-label-click' };
+                                }
+                                
+                                // 方法C: 親要素のラベルをクリック
+                                let currentElement = checkbox.parentElement;
+                                let searchDepth = 0;
+                                while (currentElement && searchDepth < 5) {
+                                    if (currentElement.tagName === 'LABEL' || currentElement.classList.contains('checkbox')) {
+                                        console.log(`親要素ラベルをクリック中 (depth: ${searchDepth})`);
+                                        currentElement.click();
+                                        if (checkbox.checked) return { success: true, method: 'parent-label-click' };
+                                    }
+                                    currentElement = currentElement.parentElement;
+                                    searchDepth++;
+                                }
+                                
+                                // 方法D: 座標ベースのクリック
+                                const rect = checkbox.getBoundingClientRect();
+                                if (rect.width > 0 && rect.height > 0) {
+                                    console.log(`座標ベースクリック: (${rect.left + rect.width/2}, ${rect.top + rect.height/2})`);
+                                    const clickEvent = new MouseEvent('click', {
+                                        bubbles: true,
+                                        cancelable: true,
+                                        clientX: rect.left + rect.width/2,
+                                        clientY: rect.top + rect.height/2
+                                    });
+                                    checkbox.dispatchEvent(clickEvent);
+                                    if (checkbox.checked) return { success: true, method: 'coordinate-click' };
+                                }
+                                
+                                // 方法E: 正当なイベント発火でチェック状態を変更
+                                console.log('正当な方法でチェック状態を変更中');
+                                
+                                // チェック状態を変更
+                                checkbox.checked = true;
+                                checkbox.setAttribute('checked', 'checked');
+                                
+                                // 適切な順序でイベントを発火
+                                const events = [
+                                    new Event('input', { bubbles: true, cancelable: true }),
+                                    new Event('change', { bubbles: true, cancelable: true }),
+                                    new MouseEvent('click', { bubbles: true, cancelable: true })
+                                ];
+                                
+                                events.forEach(event => {
+                                    checkbox.dispatchEvent(event);
+                                });
+                                
+                                // Reactの状態更新をトリガー
+                                if (checkbox._valueTracker) {
+                                    checkbox._valueTracker.setValue('');
+                                }
+                                
+                                return { success: true, method: 'proper-event-dispatch' };
+                            }, registrationCheckboxIndex);
+                            
+                            if (clickSuccess && clickSuccess.success) {
+                                sendLog(`🎯 登録内容チェックボックスを${clickSuccess.method}で処理`, 'info');
+                            } else {
+                                throw new Error(`代替方法でもクリックできませんでした: ${clickSuccess ? clickSuccess.method : 'unknown'}`);
+                            }
+                        } catch (altError) {
+                            sendLog(`❌ 代替クリック失敗: ${altError.message}`, 'error');
+                        }
+                    }
+                    
+                    // チェック状態を確認
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const isNowChecked = await page.evaluate((index) => {
+                        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                        return checkboxes[index] ? checkboxes[index].checked : false;
+                    }, registrationCheckboxIndex);
+                    
+                    if (isNowChecked) {
+                        sendLog(`✅ 「登録内容に誤りはありません」にチェックしました`, 'success');
+                    } else {
+                        sendLog(`⚠️ 登録内容チェックボックスのチェックに失敗しました`, 'warning');
+                    }
+                } else {
+                    sendLog(`✅ 「登録内容に誤りはありません」は既にチェック済みです`, 'success');
                 }
+            } else {
+                sendLog(`⚠️ 登録内容チェックボックスが見つかりませんでした`, 'warning');
             }
-
-            // 「個人情報の取り扱いに同意します」チェックボックス（2番目）
-            const checkboxes = await page.$$('input[type="checkbox"]');
-            if (checkboxes.length > 1) {
-                const privacyCheckbox = checkboxes[1];
-                const isChecked = await page.evaluate(checkbox => checkbox.checked, privacyCheckbox);
-                if (!isChecked) {
-                    await privacyCheckbox.click();
-                    sendLog('✅ 「個人情報の取り扱いに同意します」にチェックしました', 'success');
+            
+            // 「個人情報の取り扱いに同意します」チェックボックスを探してチェック
+            const privacyCheckboxIndex = checkboxAnalysis.findIndex(cb => cb.isPrivacy);
+            if (privacyCheckboxIndex !== -1) {
+                const privacyCb = checkboxAnalysis[privacyCheckboxIndex];
+                if (!privacyCb.checked) {
+                    try {
+                        // 方法1: Puppeteerのclick()メソッドを使用
+                        const checkboxes = await page.$$('input[type="checkbox"]');
+                        if (checkboxes[privacyCheckboxIndex]) {
+                            await checkboxes[privacyCheckboxIndex].click();
+                            sendLog(`🎯 個人情報チェックボックスをPuppeteerクリックで処理`, 'info');
+                        } else {
+                            throw new Error('チェックボックスが見つかりません');
+                        }
+                    } catch (puppeteerError) {
+                        sendLog(`⚠️ Puppeteerクリック失敗: ${puppeteerError.message}`, 'warning');
+                        
+                        // 方法2: 高度なチェックボックス操作
+                        try {
+                            const clickSuccess = await page.evaluate((index) => {
+                                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                                const checkbox = checkboxes[index];
+                                if (!checkbox) return { success: false, method: 'element-not-found' };
+                                
+                                console.log(`個人情報チェックボックス解析: ID=${checkbox.id}, class=${checkbox.className}`);
+                                
+                                // 方法A: ラベルを探してクリック
+                                const label = checkbox.closest('label') || document.querySelector(`label[for="${checkbox.id}"]`);
+                                if (label) {
+                                    console.log('ラベルをクリック中');
+                                    label.click();
+                                    if (checkbox.checked) return { success: true, method: 'label-click' };
+                                }
+                                
+                                // 方法B: span.checkbox__labelを探してクリック（HERPの構造対応）
+                                const spanLabel = checkbox.parentElement ? checkbox.parentElement.querySelector('span.checkbox__label') : null;
+                                if (spanLabel) {
+                                    console.log('span.checkbox__labelをクリック中');
+                                    spanLabel.click();
+                                    if (checkbox.checked) return { success: true, method: 'span-label-click' };
+                                }
+                                
+                                // 方法C: 親要素のラベルをクリック
+                                let currentElement = checkbox.parentElement;
+                                let searchDepth = 0;
+                                while (currentElement && searchDepth < 5) {
+                                    if (currentElement.tagName === 'LABEL' || currentElement.classList.contains('checkbox')) {
+                                        console.log(`親要素ラベルをクリック中 (depth: ${searchDepth})`);
+                                        currentElement.click();
+                                        if (checkbox.checked) return { success: true, method: 'parent-label-click' };
+                                    }
+                                    currentElement = currentElement.parentElement;
+                                    searchDepth++;
+                                }
+                                
+                                // 方法D: 座標ベースのクリック
+                                const rect = checkbox.getBoundingClientRect();
+                                if (rect.width > 0 && rect.height > 0) {
+                                    console.log(`座標ベースクリック: (${rect.left + rect.width/2}, ${rect.top + rect.height/2})`);
+                                    const clickEvent = new MouseEvent('click', {
+                                        bubbles: true,
+                                        cancelable: true,
+                                        clientX: rect.left + rect.width/2,
+                                        clientY: rect.top + rect.height/2
+                                    });
+                                    checkbox.dispatchEvent(clickEvent);
+                                    if (checkbox.checked) return { success: true, method: 'coordinate-click' };
+                                }
+                                
+                                // 方法E: 正当なイベント発火でチェック状態を変更
+                                console.log('正当な方法でチェック状態を変更中');
+                                
+                                // チェック状態を変更
+                                checkbox.checked = true;
+                                checkbox.setAttribute('checked', 'checked');
+                                
+                                // 適切な順序でイベントを発火
+                                const events = [
+                                    new Event('input', { bubbles: true, cancelable: true }),
+                                    new Event('change', { bubbles: true, cancelable: true }),
+                                    new MouseEvent('click', { bubbles: true, cancelable: true })
+                                ];
+                                
+                                events.forEach(event => {
+                                    checkbox.dispatchEvent(event);
+                                });
+                                
+                                // Reactの状態更新をトリガー
+                                if (checkbox._valueTracker) {
+                                    checkbox._valueTracker.setValue('');
+                                }
+                                
+                                return { success: true, method: 'proper-event-dispatch' };
+                            }, privacyCheckboxIndex);
+                            
+                            if (clickSuccess && clickSuccess.success) {
+                                sendLog(`🎯 個人情報チェックボックスを${clickSuccess.method}で処理`, 'info');
+                            } else {
+                                throw new Error(`代替方法でもクリックできませんでした: ${clickSuccess ? clickSuccess.method : 'unknown'}`);
+                            }
+                        } catch (altError) {
+                            sendLog(`❌ 代替クリック失敗: ${altError.message}`, 'error');
+                        }
+                    }
+                    
+                    // チェック状態を確認
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const isNowChecked = await page.evaluate((index) => {
+                        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                        return checkboxes[index] ? checkboxes[index].checked : false;
+                    }, privacyCheckboxIndex);
+                    
+                    if (isNowChecked) {
+                        sendLog(`✅ 「個人情報の取り扱いに同意します」にチェックしました`, 'success');
+                    } else {
+                        sendLog(`⚠️ 個人情報チェックボックスのチェックに失敗しました`, 'warning');
+                    }
+                } else {
+                    sendLog(`✅ 「個人情報の取り扱いに同意します」は既にチェック済みです`, 'success');
                 }
+            } else {
+                sendLog(`⚠️ 個人情報同意チェックボックスが見つかりませんでした`, 'warning');
+            }
+            
+            // 最終確認: すべてのチェックボックスの状態を再度確認
+            const finalCheckStates = await page.evaluate(() => {
+                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                return Array.from(checkboxes).map(cb => cb.checked);
+            });
+            
+            const allChecked = finalCheckStates.every(state => state === true);
+            if (allChecked) {
+                sendLog(`🎉 すべてのチェックボックスがチェック済みになりました`, 'success');
+            } else {
+                sendLog(`⚠️ 一部のチェックボックスが未チェックの可能性があります`, 'warning');
+                finalCheckStates.forEach((checked, i) => {
+                    sendLog(`  チェックボックス[${i}]: ${checked ? 'チェック済' : '未チェック'}`, 'info');
+                });
             }
 
             fillResult.details.push({
                 fieldName: '同意チェックボックス',
-                value: '自動チェック完了',
+                value: allChecked ? '全てチェック完了' : '一部チェック失敗',
                 source: '自動処理',
-                confidence: 100
+                confidence: allChecked ? 100 : 70
             });
 
         } catch (error) {
             sendLog(`❌ チェックボックス処理エラー: ${error.message}`, 'error');
+            console.error('チェックボックスエラースタック:', error.stack);
         }
 
         fillResult.success = true;
