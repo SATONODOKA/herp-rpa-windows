@@ -1052,9 +1052,13 @@
             
             if (pdfAnalysis.extractedName) html += `<p><strong>氏名:</strong> ${pdfAnalysis.extractedName}</p>`;
             if (pdfAnalysis.furigana) html += `<p><strong>ふりがな:</strong> ${pdfAnalysis.furigana}</p>`;
+            if (pdfAnalysis.age) html += `<p><strong>年齢:</strong> ${pdfAnalysis.age}歳</p>`;
+            if (pdfAnalysis.phone) html += `<p><strong>電話番号:</strong> ${pdfAnalysis.phone}</p>`;
+            if (pdfAnalysis.email) html += `<p><strong>メールアドレス:</strong> ${pdfAnalysis.email}</p>`;
             
-            // 未実装項目は表示しない
-            html += `<p><em>その他の項目（メール、電話番号など）は今後実装予定</em></p>`;
+            // 未実装項目がある場合の表示
+            const implementedFields = ['氏名', 'ふりがな', '年齢', '電話番号', 'メールアドレス'];
+            html += `<p><em>実装済み項目: ${implementedFields.join(', ')}</em></p>`;
             
             html += `</div>`;
             html += '</div>';

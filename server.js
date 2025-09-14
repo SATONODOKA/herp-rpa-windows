@@ -1130,13 +1130,16 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
             pdfData: {
                 name: pdfResult.extractedName,
                 furigana: pdfResult.furigana,
+                age: pdfResult.age,
+                phone: pdfResult.phone,
+                email: pdfResult.email,
                 confidence: pdfResult.confidence
             },
             raCommentData: {}
         };
 
         // デバッグ: PDFデータの内容をログ出力
-        sendLog(`PDF抽出データ: 氏名「${pdfResult.extractedName || '未検出'}」, フリガナ「${pdfResult.furigana || '未検出'}」`, 'info');
+        sendLog(`PDF抽出データ: 氏名「${pdfResult.extractedName || '未検出'}」, フリガナ「${pdfResult.furigana || '未検出'}」, 年齢「${pdfResult.age || '未検出'}」, 電話「${pdfResult.phone || '未検出'}」, メール「${pdfResult.email || '未検出'}」`, 'info');
         sendLog(`RAコメント: ${extractionResult.originalData || 'なし'}`, 'info');
 
         // 必須項目を取得（フロントエンドと同じ判定ロジックを使用）
@@ -1178,14 +1181,18 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 mapping.value = pdfResult.furigana;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.furigana ? Math.min(pdfResult.confidence, 90) : 0;
-            } else if (field.name.includes('メール') || field.name.includes('email')) {
-                mapping.value = null; // まだ未実装
+            } else if (field.name.includes('年齢')) {
+                mapping.value = pdfResult.age ? `${pdfResult.age}歳` : null;
                 mapping.source = 'PDF-simple-extractor';
-                mapping.confidence = 0;
-            } else if (field.name.includes('電話') || field.name.includes('TEL')) {
-                mapping.value = null; // まだ未実装
+                mapping.confidence = pdfResult.age ? pdfResult.confidence : 0;
+            } else if (field.name.includes('電話') || field.name.includes('TEL') || field.name.includes('電話番号')) {
+                mapping.value = pdfResult.phone;
                 mapping.source = 'PDF-simple-extractor';
-                mapping.confidence = 0;
+                mapping.confidence = pdfResult.phone ? pdfResult.confidence : 0;
+            } else if (field.name.includes('メール') || field.name.includes('email') || field.name.includes('Email') || field.name.includes('メールアドレス')) {
+                mapping.value = pdfResult.email;
+                mapping.source = 'PDF-simple-extractor';
+                mapping.confidence = pdfResult.email ? pdfResult.confidence : 0;
             }
 
             // RAコメントからマッピング（年収関連）
@@ -1287,6 +1294,9 @@ async function generateEnhancedJson(originalJson, pdfResult, mappingResult, jobN
                     extractionMethod: pdfResult.method || 'pdf-parse-simple',
                     extractedName: pdfResult.extractedName,
                     furigana: pdfResult.furigana,
+                    age: pdfResult.age,
+                    phone: pdfResult.phone,
+                    email: pdfResult.email,
                     confidence: pdfResult.confidence
                 },
                 mappingResult: {
@@ -1394,12 +1404,23 @@ app.post('/execute', upload.fields([
         // PDFファイルを解析（新しいシンプル抽出器を使用）
         sendLog('PDFファイルを解析しています...');
         const simplePDFExtractor = new SimplePDFExtractor();
-        simplePDFExtractor.debug = false; // 本番では詳細ログを無効化
+        simplePDFExtractor.debug = true; // デバッグモードを有効化
         
         const pdfResult = await simplePDFExtractor.extractTextFromPDF(pdfFile.path);
         
         if (pdfResult.success) {
-            sendLog(`PDF解析完了: 氏名「${pdfResult.extractedName || '未検出'}」を抽出しました`);
+            const extractedItems = [];
+            if (pdfResult.extractedName) extractedItems.push(`氏名「${pdfResult.extractedName}」`);
+            if (pdfResult.furigana) extractedItems.push(`ふりがな「${pdfResult.furigana}」`);
+            if (pdfResult.age) extractedItems.push(`年齢「${pdfResult.age}歳」`);
+            if (pdfResult.phone) extractedItems.push(`電話「${pdfResult.phone}」`);
+            if (pdfResult.email) extractedItems.push(`メール「${pdfResult.email}」`);
+            
+            if (extractedItems.length > 0) {
+                sendLog(`PDF解析完了: ${extractedItems.join(', ')}を抽出しました`);
+            } else {
+                sendLog('PDF解析完了: データが抽出されませんでした', 'warning');
+            }
         } else {
             sendLog(`PDF解析エラー: ${pdfResult.error}`, 'error');
         }
@@ -1603,7 +1624,16 @@ app.post('/execute', upload.fields([
                         matchResult.matchedJob
                     );
                     
-                    formAnalysisResult.pdfAnalysis = pdfResult;
+                    // フロントエンド用のpdfAnalysis構造に変換
+                    formAnalysisResult.pdfAnalysis = {
+                        method: pdfResult.method || 'pdf-parse-simple',
+                        extractedName: pdfResult.extractedName,
+                        furigana: pdfResult.furigana,
+                        age: pdfResult.age,
+                        phone: pdfResult.phone,
+                        email: pdfResult.email,
+                        confidence: pdfResult.confidence
+                    };
                     formAnalysisResult.dataMapping = mappingResult;
                     formAnalysisResult.enhancedJson = enhancedJson;
                 } else {

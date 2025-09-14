@@ -1,0 +1,341 @@
+{
+  "success": true,
+  "error": null,
+  "jobName": "プロジェクトマネージャー",
+  "timestamp": "2025-09-14T09:41:12.170Z",
+  "totalFields": 18,
+  "requiredFields": 16,
+  "optionalFields": 2,
+  "fields": [
+    {
+      "index": 9,
+      "name": "応募者氏名",
+      "type": "text",
+      "required": true,
+      "detectionMethod": "labeled-form-item + required-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": true,
+      "hasOptionalIndicator": false,
+      "hasInput": true
+    },
+    {
+      "index": 16,
+      "name": "現所属",
+      "type": "text",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(RA-comment)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 23,
+      "name": "年齢",
+      "type": "text",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 30,
+      "name": "最終学歴",
+      "type": "text",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 37,
+      "name": "電話番号",
+      "type": "text",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 44,
+      "name": "メールアドレス",
+      "type": "email",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 51,
+      "name": "推薦時コメント",
+      "type": "textarea",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 58,
+      "name": "履歴書",
+      "type": "file",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 62,
+      "name": "職務経歴書",
+      "type": "file",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 66,
+      "name": "その他のファイル",
+      "type": "file",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 70,
+      "name": "経歴",
+      "type": "textarea",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 77,
+      "name": "リンク",
+      "type": "text",
+      "required": false,
+      "detectionMethod": "labeled-form-item + optional-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 87,
+      "name": "現年収",
+      "type": "text",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(RA-comment)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 94,
+      "name": "希望年収",
+      "type": "text",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 101,
+      "name": "希望年収（最低）",
+      "type": "text",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(JSON-specified)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 108,
+      "name": "その他希望条件",
+      "type": "textarea",
+      "required": true,
+      "detectionMethod": "labeled-form-item + optional-element + additional-required(RA-comment)",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": true,
+      "hasInput": true
+    },
+    {
+      "index": 118,
+      "name": "登録内容に誤りはありません",
+      "type": "checkbox",
+      "required": true,
+      "detectionMethod": "labeled-form-item + required-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": false,
+      "hasOptionalIndicator": false,
+      "hasInput": true
+    },
+    {
+      "index": 119,
+      "name": "エージェント様の個人情報の取り扱いについて",
+      "type": "checkbox",
+      "required": true,
+      "detectionMethod": "labeled-form-item + required-element",
+      "hasLabel": true,
+      "hasRequiredIndicator": true,
+      "hasOptionalIndicator": false,
+      "hasInput": true
+    }
+  ],
+  "pageUrl": "https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw/requisitions/id/52dc328e-a108-4e08-9d9d-af64e5827545/candidacies/add",
+  "companyName": "株式会社リクルート プロジェクトマネージャーに推薦する",
+  "additionalRequiredOverrides": {
+    "specifiedFields": [
+      "応募者氏名",
+      "年齢",
+      "最終学歴",
+      "電話番号",
+      "メールアドレス",
+      "推薦時コメント",
+      "履歴書",
+      "経歴",
+      "希望年収（最低）"
+    ],
+    "raCommentFields": [
+      "現在の年収",
+      "年収（現在）",
+      "現年収",
+      "その他希望条件",
+      "その他の希望条件",
+      "備考",
+      "希望年収",
+      "年収（希望）",
+      "最低希望年収",
+      "年収（最低）",
+      "現所属",
+      "現在の所属",
+      "勤務先"
+    ],
+    "appliedCount": 13,
+    "appliedFields": [
+      {
+        "fieldName": "年齢",
+        "originalRequired": false,
+        "overriddenBy": "年齢",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "最終学歴",
+        "originalRequired": false,
+        "overriddenBy": "最終学歴",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "電話番号",
+        "originalRequired": false,
+        "overriddenBy": "電話番号",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "メールアドレス",
+        "originalRequired": false,
+        "overriddenBy": "メールアドレス",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "推薦時コメント",
+        "originalRequired": false,
+        "overriddenBy": "推薦時コメント",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "履歴書",
+        "originalRequired": false,
+        "overriddenBy": "履歴書",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "職務経歴書",
+        "originalRequired": false,
+        "overriddenBy": "経歴",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "経歴",
+        "originalRequired": false,
+        "overriddenBy": "経歴",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "希望年収",
+        "originalRequired": false,
+        "overriddenBy": "希望年収（最低）",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "希望年収（最低）",
+        "originalRequired": false,
+        "overriddenBy": "希望年収（最低）",
+        "sourceType": "JSON-specified"
+      },
+      {
+        "fieldName": "現年収",
+        "originalRequired": false,
+        "overriddenBy": "現在の年収",
+        "sourceType": "RA-comment"
+      },
+      {
+        "fieldName": "その他希望条件",
+        "originalRequired": false,
+        "overriddenBy": "その他希望条件",
+        "sourceType": "RA-comment"
+      },
+      {
+        "fieldName": "現所属",
+        "originalRequired": false,
+        "overriddenBy": "現所属",
+        "sourceType": "RA-comment"
+      }
+    ]
+  },
+  "analysis": {
+    "summary": {
+      "totalFields": 18,
+      "requiredFields": 16,
+      "optionalFields": 2,
+      "requiredPercentage": 89
+    },
+    "fieldsByType": {
+      "text": 9,
+      "email": 1,
+      "textarea": 3,
+      "file": 3,
+      "checkbox": 2
+    },
+    "detectionMethods": {
+      "labeled-form-item + required-element": 3,
+      "labeled-form-item + optional-element + additional-required(RA-comment)": 3,
+      "labeled-form-item + optional-element + additional-required(JSON-specified)": 10,
+      "labeled-form-item + optional-element": 2
+    }
+  }
+}

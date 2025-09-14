@@ -31,15 +31,21 @@ class SimplePDFExtractor {
                 console.log('=' + '='.repeat(60));
             }
             
-            // 氏名を抽出
+            // 各種データを抽出
             const nameResult = this.extractNameFromText(data.text);
+            const ageResult = this.extractAgeFromText(data.text);
+            const phoneResult = this.extractPhoneFromText(data.text);
+            const emailResult = this.extractEmailFromText(data.text);
             
             return {
                 success: true,
                 fullText: data.text,
                 extractedName: nameResult.name,
                 furigana: nameResult.furigana,
-                confidence: nameResult.confidence,
+                age: ageResult.age,
+                phone: phoneResult.phone,
+                email: emailResult.email,
+                confidence: Math.max(nameResult.confidence, ageResult.confidence, phoneResult.confidence, emailResult.confidence),
                 method: 'pdf-parse-simple'
             };
             
@@ -262,6 +268,159 @@ class SimplePDFExtractor {
         }
         
         return null;
+    }
+
+    /**
+     * テキストから年齢を抽出
+     */
+    extractAgeFromText(text) {
+        console.log('\n🔍 テキストから年齢を抽出します...');
+        
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        let ageCandidate = null;
+        let confidence = 0;
+        
+        for (const line of lines) {
+            // 満xx歳のパターン
+            const agePatterns = [
+                /満(\d{1,2})歳/,           // 満25歳
+                /\(満(\d{1,2})歳\)/,      // (満25歳)
+                /（満(\d{1,2})歳）/,      // （満25歳）
+                /満\s*(\d{1,2})\s*歳/,   // 満 25 歳
+                /(\d{1,2})歳\s*男/,       // 25歳 男
+                /(\d{1,2})歳\s*女/        // 25歳 女
+            ];
+            
+            for (const pattern of agePatterns) {
+                const match = line.match(pattern);
+                if (match) {
+                    const age = parseInt(match[1]);
+                    if (age >= 15 && age <= 80) { // 妥当な年齢範囲
+                        ageCandidate = age;
+                        confidence = 95;
+                        console.log(`✅ 年齢発見: "${line}" → ${age}歳`);
+                        break;
+                    }
+                }
+            }
+            
+            if (ageCandidate) break;
+        }
+        
+        if (!ageCandidate) {
+            console.log('⚠️ 年齢が見つかりませんでした');
+        }
+        
+        return {
+            age: ageCandidate,
+            confidence: confidence
+        };
+    }
+
+    /**
+     * テキストから電話番号を抽出
+     */
+    extractPhoneFromText(text) {
+        console.log('\n🔍 テキストから電話番号を抽出します...');
+        
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        let phoneCandidate = null;
+        let confidence = 0;
+        
+        for (const line of lines) {
+            // 電話番号のパターン（より厳密に）
+            const phonePatterns = [
+                /電話[：:\s]*(\d{2,4}[-\s]?\d{2,4}[-\s]?\d{4})/, // 電話 080-1234-5678
+                /TEL[：:\s]*(\d{2,4}[-\s]?\d{2,4}[-\s]?\d{4})/,  // TEL: 080-1234-5678
+                /(0\d{1,3}[-\s]?\d{2,4}[-\s]?\d{4})/,          // 080-1234-5678, 03-1234-5678 (0で始まる)
+                /(0\d{9,10})/                                   // 08012345678 (0で始まる10-11桁)
+            ];
+            
+            for (const pattern of phonePatterns) {
+                const match = line.match(pattern);
+                if (match) {
+                    let phone = match[1];
+                    
+                    // 電話番号の妥当性チェック
+                    const cleanPhone = phone.replace(/[-\s]/g, '');
+                    
+                    // 日本の電話番号は10桁または11桁で0で始まる
+                    if (!/^0\d{9,10}$/.test(cleanPhone)) {
+                        continue; // 無効な電話番号はスキップ
+                    }
+                    
+                    // 数字のみの場合はハイフンを追加
+                    if (/^\d{10,11}$/.test(phone)) {
+                        if (phone.length === 11) {
+                            // 080-1234-5678 形式
+                            phone = phone.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+                        } else if (phone.length === 10) {
+                            // 03-1234-5678 形式
+                            phone = phone.replace(/(\d{2,3})(\d{4})(\d{4})/, '$1-$2-$3');
+                        }
+                    }
+                    
+                    phoneCandidate = phone;
+                    confidence = 90;
+                    console.log(`✅ 電話番号発見: "${line}" → ${phone}`);
+                    break;
+                }
+            }
+            
+            if (phoneCandidate) break;
+        }
+        
+        if (!phoneCandidate) {
+            console.log('⚠️ 電話番号が見つかりませんでした');
+        }
+        
+        return {
+            phone: phoneCandidate,
+            confidence: confidence
+        };
+    }
+
+    /**
+     * テキストから メールアドレスを抽出
+     */
+    extractEmailFromText(text) {
+        console.log('\n🔍 テキストからメールアドレスを抽出します...');
+        
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        let emailCandidate = null;
+        let confidence = 0;
+        
+        for (const line of lines) {
+            // メールアドレスのパターン（@を含む）
+            const emailPatterns = [
+                /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/,  // 標準的なメールアドレス
+                /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+)/                  // ドメイン部分が短い場合
+            ];
+            
+            for (const pattern of emailPatterns) {
+                const match = line.match(pattern);
+                if (match) {
+                    emailCandidate = match[1];
+                    confidence = 95;
+                    console.log(`✅ メールアドレス発見: "${line}" → ${emailCandidate}`);
+                    break;
+                }
+            }
+            
+            if (emailCandidate) break;
+        }
+        
+        if (!emailCandidate) {
+            console.log('⚠️ メールアドレスが見つかりませんでした');
+        }
+        
+        return {
+            email: emailCandidate,
+            confidence: confidence
+        };
     }
 
     /**
