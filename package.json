@@ -13,6 +13,8 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "multer": "^2.0.2",
+    "pdf-parse": "^1.1.1",
+    "pdf2json": "^3.2.1",
     "puppeteer": "^24.20.0"
   }
 }

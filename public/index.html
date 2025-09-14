@@ -40,6 +40,105 @@
             background-color: #e3f2fd;
         }
         
+        .file-group {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #fefefe;
+        }
+        
+        .file-group h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .file-group p {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .file-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .mapping-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        
+        .mapping-table th,
+        .mapping-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .mapping-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        
+        .source-pdf {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .source-raコメント {
+            background-color: #fff3e0;
+            color: #f57c00;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .confidence.high-confidence {
+            color: #2e7d32;
+            font-weight: bold;
+        }
+        
+        .confidence.medium-confidence {
+            color: #f57c00;
+            font-weight: bold;
+        }
+        
+        .confidence.low-confidence {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+        
+        .analysis-section,
+        .mapping-section {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        
+        .analysis-summary,
+        .mapping-summary {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .pdf-data p {
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+        
         input[type="file"] {
             margin: 10px 0;
         }
@@ -330,9 +429,23 @@
         <h1>求人照合RPAツール (安全性強化版)</h1>
         
         <div class="upload-section" id="uploadSection">
-            <p>JSONファイルをドラッグ&ドロップするか、ファイルを選択してください</p>
-            <input type="file" id="fileInput" accept=".json" />
-            <div id="fileInfo"></div>
+            <h2>📄 ファイルをアップロード</h2>
+            
+            <!-- JSON ファイル -->
+            <div class="file-group">
+                <h3>📋 JSONファイル（必須）</h3>
+                <p>求人情報とRAコメントを含むJSONファイル</p>
+                <input type="file" id="fileInput" accept=".json" />
+                <div id="fileInfo" class="file-info"></div>
+            </div>
+            
+            <!-- PDF ファイル -->
+            <div class="file-group">
+                <h3>📑 履歴書PDF（必須）</h3>
+                <p>候補者の履歴書PDFファイル</p>
+                <input type="file" id="pdfInput" accept=".pdf" />
+                <div id="pdfInfo" class="file-info"></div>
+            </div>
         </div>
         
         <div id="status" class="status" style="display: none;"></div>
@@ -365,6 +478,16 @@
                 <h3>フォーム解析結果</h3>
                 <div id="formAnalysis"></div>
             </div>
+            
+            <div class="result-section">
+                <h3>PDF解析結果</h3>
+                <div id="pdfAnalysis"></div>
+            </div>
+            
+            <div class="result-section">
+                <h3>必須項目と入力データ</h3>
+                <div id="requiredFieldsData"></div>
+            </div>
         </div>
         
         <div class="log" id="log"></div>
@@ -372,11 +495,14 @@
 
     <script>
         let uploadedData = null;
+        let uploadedPdf = null;
         let eventSource = null;
 
         const fileInput = document.getElementById('fileInput');
+        const pdfInput = document.getElementById('pdfInput');
         const uploadSection = document.getElementById('uploadSection');
         const fileInfo = document.getElementById('fileInfo');
+        const pdfInfo = document.getElementById('pdfInfo');
         const status = document.getElementById('status');
         const executeBtn = document.getElementById('executeBtn');
         const closeBtn = document.getElementById('closeBtn');
@@ -411,6 +537,41 @@
             }
         });
 
+        // PDFファイル処理
+        pdfInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handlePdfFile(e.target.files[0]);
+            }
+        });
+
+        async function handlePdfFile(file) {
+            if (!file.name.endsWith('.pdf')) {
+                updateStatus('PDFファイルを選択してください', 'error');
+                return;
+            }
+
+            try {
+                updateStatus('PDFファイルを選択中...', 'info');
+                uploadedPdf = file;
+                pdfInfo.innerHTML = `<strong>ファイル名:</strong> ${file.name}<br><strong>サイズ:</strong> ${(file.size / 1024).toFixed(1)} KB`;
+                updateStatus('PDFファイルが選択されました', 'success');
+                
+                // 両方のファイルがアップロードされているかチェック
+                checkFilesReady();
+            } catch (error) {
+                updateStatus(`PDFファイル選択エラー: ${error.message}`, 'error');
+                executeBtn.disabled = true;
+            }
+        }
+
+        // 両方のファイルが準備できているかチェック
+        function checkFilesReady() {
+            executeBtn.disabled = !(uploadedData && uploadedPdf);
+            if (uploadedData && uploadedPdf) {
+                updateStatus('両方のファイルが準備完了しました。実行ボタンを押してください。', 'success');
+            }
+        }
+
         async function handleFile(file) {
             if (!file.name.endsWith('.json')) {
                 updateStatus('JSONファイルを選択してください', 'error');
@@ -431,12 +592,14 @@
 
                 if (response.ok) {
                     uploadedData = result.data;
-                    updateStatus('ファイルが正常にアップロードされました', 'success');
+                    updateStatus('JSONファイルが正常にアップロードされました', 'success');
                     fileInfo.innerHTML = `<strong>ファイル名:</strong> ${file.name}<br><strong>サイズ:</strong> ${file.size} bytes`;
-                    executeBtn.disabled = false;
                     
                     // アップロードされたデータの形式を表示
                     displayUploadedDataInfo(uploadedData);
+                    
+                    // 両方のファイルがアップロードされているかチェック
+                    checkFilesReady();
                 } else {
                     updateStatus(`エラー: ${result.error}`, 'error');
                     executeBtn.disabled = true;
@@ -608,6 +771,16 @@
             // フォーム解析結果の表示
             console.log('フォーム解析結果:', result.formAnalysis);
             displayFormAnalysis(result.formAnalysis);
+            
+            // PDF解析結果の表示
+            if (result.formAnalysis && result.formAnalysis.pdfAnalysis) {
+                displayPdfAnalysis(result.formAnalysis.pdfAnalysis);
+            }
+            
+            // 必須項目とデータマッピングの表示
+            if (result.formAnalysis && result.formAnalysis.dataMapping) {
+                displayRequiredFieldsData(result.formAnalysis.dataMapping);
+            }
         }
         
         function displayFormAnalysis(formAnalysis) {
@@ -788,8 +961,8 @@
         });
 
         executeBtn.addEventListener('click', async () => {
-            if (!uploadedData) {
-                addLog('JSONファイルがアップロードされていません', 'error');
+            if (!uploadedData || !uploadedPdf) {
+                addLog('JSONファイルとPDFファイルの両方が必要です', 'error');
                 return;
             }
 
@@ -826,12 +999,19 @@
             };
 
             try {
+                // FormDataを作成してファイルを送信
+                const formData = new FormData();
+                
+                // JSONファイルを再作成
+                const jsonBlob = new Blob([JSON.stringify(uploadedData)], { type: 'application/json' });
+                formData.append('jsonFile', jsonBlob, 'data.json');
+                
+                // PDFファイルを追加
+                formData.append('pdfFile', uploadedPdf);
+                
                 const response = await fetch('/execute', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ data: uploadedData })
+                    body: formData
                 });
 
                 const result = await response.json();
@@ -853,10 +1033,98 @@
             }
         });
 
+        // PDF解析結果を表示する関数
+        function displayPdfAnalysis(pdfAnalysis) {
+            const pdfAnalysisDiv = document.getElementById('pdfAnalysis');
+            if (!pdfAnalysisDiv) return;
+
+            let html = '<div class="analysis-section">';
+            html += `<h4>📄 PDF解析結果</h4>`;
+            html += `<div class="analysis-summary">`;
+            html += `<p><strong>抽出方法:</strong> ${pdfAnalysis.extractionMethod}</p>`;
+            html += `<p><strong>ページ数:</strong> ${pdfAnalysis.pdfPages}</p>`;
+            html += `<p><strong>文字数:</strong> ${pdfAnalysis.textLength}</p>`;
+            html += `</div>`;
+
+            html += `<h5>抽出された個人情報</h5>`;
+            html += `<div class="pdf-data">`;
+            const formData = pdfAnalysis.analyzedData.formData;
+            
+            if (formData.name) html += `<p><strong>氏名:</strong> ${formData.name}</p>`;
+            if (formData.furigana) html += `<p><strong>ふりがな:</strong> ${formData.furigana}</p>`;
+            if (formData.email) html += `<p><strong>メール:</strong> ${formData.email}</p>`;
+            if (formData.phone) html += `<p><strong>電話:</strong> ${formData.phone}</p>`;
+            if (formData.address) html += `<p><strong>住所:</strong> ${formData.address}</p>`;
+            if (formData.birthDate) html += `<p><strong>生年月日:</strong> ${formData.birthDate}</p>`;
+            if (formData.gender) html += `<p><strong>性別:</strong> ${formData.gender}</p>`;
+            if (formData.currentCompany) html += `<p><strong>現在の会社:</strong> ${formData.currentCompany}</p>`;
+            
+            html += `</div>`;
+            html += '</div>';
+
+            pdfAnalysisDiv.innerHTML = html;
+        }
+
+        // 必須項目とデータマッピングを表示する関数
+        function displayRequiredFieldsData(dataMapping) {
+            const requiredFieldsDataDiv = document.getElementById('requiredFieldsData');
+            if (!requiredFieldsDataDiv) return;
+
+            let html = '<div class="mapping-section">';
+            html += `<h4>🎯 必須項目とデータマッピング結果</h4>`;
+            html += `<div class="mapping-summary">`;
+            html += `<p><strong>マッピング成功:</strong> ${dataMapping.mappedFields}個</p>`;
+            html += `<p><strong>マッピング失敗:</strong> ${dataMapping.unmappedFields.length}個</p>`;
+            html += `</div>`;
+
+            if (dataMapping.mappings.length > 0) {
+                html += `<h5>✅ マッピング成功項目</h5>`;
+                html += `<div class="mapping-success">`;
+                html += `<table class="mapping-table">`;
+                html += `<thead><tr><th>項目名</th><th>値</th><th>データソース</th><th>信頼度</th></tr></thead>`;
+                html += `<tbody>`;
+                
+                dataMapping.mappings.forEach(mapping => {
+                    const confidenceClass = mapping.confidence >= 90 ? 'high-confidence' : 
+                                           mapping.confidence >= 70 ? 'medium-confidence' : 'low-confidence';
+                    html += `<tr>`;
+                    html += `<td>${mapping.fieldName}</td>`;
+                    html += `<td>${mapping.value}</td>`;
+                    html += `<td><span class="source-${mapping.source.toLowerCase()}">${mapping.source}</span></td>`;
+                    html += `<td><span class="confidence ${confidenceClass}">${mapping.confidence}%</span></td>`;
+                    html += `</tr>`;
+                });
+                
+                html += `</tbody></table>`;
+                html += `</div>`;
+            }
+
+            if (dataMapping.unmappedFields.length > 0) {
+                html += `<h5>❌ マッピング失敗項目</h5>`;
+                html += `<div class="mapping-failed">`;
+                html += `<table class="mapping-table">`;
+                html += `<thead><tr><th>項目名</th><th>理由</th></tr></thead>`;
+                html += `<tbody>`;
+                
+                dataMapping.unmappedFields.forEach(field => {
+                    html += `<tr>`;
+                    html += `<td>${field.fieldName}</td>`;
+                    html += `<td>${field.reason}</td>`;
+                    html += `</tr>`;
+                });
+                
+                html += `</tbody></table>`;
+                html += `</div>`;
+            }
+
+            html += '</div>';
+            requiredFieldsDataDiv.innerHTML = html;
+        }
+
         // 初期化
-        addLog('求人照合RPAツール (安全性強化版) が起動しました');
-        addLog('新しいJSON書式に対応しています');
-        addLog('フォーム解析機能が追加されました');
+        addLog('求人照合RPAツール (PDF統合版) が起動しました');
+        addLog('JSONファイルとPDFファイルの両方をアップロードしてください');
+        addLog('PDF解析とデータマッピング機能が追加されました');
     </script>
 </body>
 </html>

@@ -4,6 +4,7 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const { extractResumeData } = require('./pdf_processing/pdf-extractor');
 
 const app = express();
 const port = 3000;
@@ -12,7 +13,35 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const upload = multer({ dest: 'uploads/' });
+// multer設定（JSONとPDFファイル用）
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        if (file.fieldname === 'jsonFile') {
+            cb(null, 'uploads/');
+        } else if (file.fieldname === 'pdfFile') {
+            cb(null, 'uploads/pdfs/');
+        } else {
+            cb(null, 'uploads/');
+        }
+    },
+    filename: function (req, file, cb) {
+        const timestamp = new Date().toISOString().replace(/:/g, '-');
+        cb(null, `${timestamp}-${file.originalname}`);
+    }
+});
+
+const upload = multer({ 
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        if (file.fieldname === 'jsonFile' && file.mimetype === 'application/json') {
+            cb(null, true);
+        } else if (file.fieldname === 'pdfFile' && file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('不正なファイル形式です'), false);
+        }
+    }
+});
 
 let browser = null;
 let page = null;
@@ -1088,6 +1117,215 @@ async function saveFormAnalysisToFile(analysisResult, jobName) {
     }
 }
 
+// PDF解析結果と必須項目をマッピングする関数
+async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extractionResult) {
+    try {
+        const mappingResult = {
+            success: true,
+            mappedFields: 0,
+            mappings: [],
+            unmappedFields: [],
+            pdfData: pdfResult.analyzedData.formData,
+            raCommentData: {}
+        };
+
+        // デバッグ: PDFデータの内容をログ出力
+        sendLog(`PDF抽出データ: ${JSON.stringify(pdfResult.analyzedData.formData, null, 2)}`, 'info');
+        sendLog(`RAコメント: ${extractionResult.originalData || 'なし'}`, 'info');
+
+        // 必須項目を取得（フロントエンドと同じ判定ロジックを使用）
+        const requiredFields = formAnalysisResult.fields.filter(field => field.required);
+        
+        sendLog(`必須項目 ${requiredFields.length}個をマッピング中...`, 'info');
+        sendLog(`フォーム解析結果の全項目数: ${formAnalysisResult.fields ? formAnalysisResult.fields.length : 0}`, 'info');
+        sendLog(`フォーム解析結果の構造: ${JSON.stringify(Object.keys(formAnalysisResult), null, 2)}`, 'info');
+        
+        // デバッグ: 必須項目の詳細をログ出力
+        if (requiredFields.length > 0) {
+            sendLog(`必須項目一覧: ${requiredFields.map(f => f.name).join(', ')}`, 'info');
+        } else {
+            sendLog('⚠️ 必須項目が見つかりません', 'warning');
+            // 全項目の詳細をログ出力
+            if (formAnalysisResult.fields && formAnalysisResult.fields.length > 0) {
+                sendLog('全項目の詳細:', 'info');
+                formAnalysisResult.fields.forEach((field, index) => {
+                    sendLog(`  ${index + 1}. ${field.name} - ${field.required ? '必須' : '任意'} (${field.detectionMethod})`, 'info');
+                });
+            }
+        }
+
+        for (const field of requiredFields) {
+            const mapping = {
+                fieldName: field.name,
+                fieldType: field.type,
+                value: null,
+                source: null,
+                confidence: 0
+            };
+
+            // PDFデータからマッピング
+            if (field.name.includes('氏名') || field.name.includes('名前')) {
+                mapping.value = pdfResult.analyzedData.formData.name;
+                mapping.source = 'PDF';
+                mapping.confidence = pdfResult.analyzedData.formData.name ? 95 : 0;
+            } else if (field.name.includes('ふりがな') || field.name.includes('フリガナ')) {
+                mapping.value = pdfResult.analyzedData.formData.furigana;
+                mapping.source = 'PDF';
+                mapping.confidence = pdfResult.analyzedData.formData.furigana ? 90 : 0;
+            } else if (field.name.includes('メール') || field.name.includes('email')) {
+                mapping.value = pdfResult.analyzedData.formData.email;
+                mapping.source = 'PDF';
+                mapping.confidence = pdfResult.analyzedData.formData.email ? 95 : 0;
+            } else if (field.name.includes('電話') || field.name.includes('TEL')) {
+                mapping.value = pdfResult.analyzedData.formData.phone;
+                mapping.source = 'PDF';
+                mapping.confidence = pdfResult.analyzedData.formData.phone ? 95 : 0;
+            } else if (field.name.includes('住所')) {
+                mapping.value = pdfResult.analyzedData.formData.address;
+                mapping.source = 'PDF';
+                mapping.confidence = pdfResult.analyzedData.formData.address ? 90 : 0;
+            } else if (field.name.includes('生年月日') || field.name.includes('誕生日')) {
+                mapping.value = pdfResult.analyzedData.formData.birthDate;
+                mapping.source = 'PDF';
+                mapping.confidence = pdfResult.analyzedData.formData.birthDate ? 95 : 0;
+            } else if (field.name.includes('性別')) {
+                mapping.value = pdfResult.analyzedData.formData.gender;
+                mapping.source = 'PDF';
+                mapping.confidence = pdfResult.analyzedData.formData.gender ? 90 : 0;
+            } else if (field.name.includes('現所属') || field.name.includes('勤務先')) {
+                mapping.value = pdfResult.analyzedData.formData.currentCompany;
+                mapping.source = 'PDF';
+                mapping.confidence = pdfResult.analyzedData.formData.currentCompany ? 85 : 0;
+            }
+
+            // RAコメントからマッピング（年収関連）
+            if (field.name.includes('年収')) {
+                const raComment = extractionResult.originalData || '';
+                
+                if (field.name.includes('現在') || field.name.includes('現年収')) {
+                    const currentSalaryMatch = raComment.match(/現年収[：:\s]*(\d+)万円?/);
+                    if (currentSalaryMatch) {
+                        mapping.value = currentSalaryMatch[1] + '万円';
+                        mapping.source = 'RAコメント';
+                        mapping.confidence = 95;
+                    }
+                } else if (field.name.includes('希望') && !field.name.includes('最低')) {
+                    const desiredSalaryMatch = raComment.match(/希望年収[：:\s]*(\d+)万円?/);
+                    if (desiredSalaryMatch) {
+                        mapping.value = desiredSalaryMatch[1] + '万円';
+                        mapping.source = 'RAコメント';
+                        mapping.confidence = 95;
+                    }
+                } else if (field.name.includes('最低')) {
+                    const minSalaryMatch = raComment.match(/最低[希望]*年収[：:\s]*(\d+)万円?/);
+                    if (minSalaryMatch) {
+                        mapping.value = minSalaryMatch[1] + '万円';
+                        mapping.source = 'RAコメント';
+                        mapping.confidence = 95;
+                    }
+                }
+            }
+
+            // その他希望条件（RAコメントの補足文言）
+            if (field.name.includes('その他希望条件') || field.name.includes('備考')) {
+                const raComment = extractionResult.originalData || '';
+                const noteMatch = raComment.match(/【(.+?)】/);
+                if (noteMatch) {
+                    mapping.value = noteMatch[1];
+                    mapping.source = 'RAコメント';
+                    mapping.confidence = 90;
+                }
+            }
+
+            if (mapping.value && mapping.confidence > 0) {
+                mappingResult.mappedFields++;
+                mappingResult.mappings.push(mapping);
+                sendLog(`マッピング成功: ${field.name} = ${mapping.value} (${mapping.source})`, 'info');
+            } else {
+                mappingResult.unmappedFields.push({
+                    fieldName: field.name,
+                    fieldType: field.type,
+                    reason: 'PDFまたはRAコメントに対応するデータが見つかりません'
+                });
+                sendLog(`マッピング失敗: ${field.name} - データが見つかりません`, 'warning');
+            }
+        }
+
+        return mappingResult;
+
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message,
+            mappedFields: 0,
+            mappings: [],
+            unmappedFields: []
+        };
+    }
+}
+
+// 拡張JSONを生成する関数
+async function generateEnhancedJson(originalJson, pdfResult, mappingResult, jobName) {
+    try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const sanitizedJobName = jobName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+        const fileName = `enhanced_${sanitizedJobName}_${timestamp}.json`;
+        const filePath = path.join(__dirname, 'results/enhanced_jsons', fileName);
+
+        // ディレクトリが存在しない場合は作成
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
+        const enhancedData = {
+            metadata: {
+                originalJsonFile: originalJson,
+                pdfAnalysisResult: {
+                    extractionMethod: pdfResult.extractionMethod,
+                    textLength: pdfResult.textLength,
+                    pdfPages: pdfResult.pdfPages
+                },
+                mappingResult: {
+                    mappedFields: mappingResult.mappedFields,
+                    totalRequiredFields: mappingResult.mappings.length + mappingResult.unmappedFields.length
+                },
+                generatedAt: new Date().toISOString(),
+                targetJob: jobName
+            },
+            formData: {},
+            unmappedRequiredFields: mappingResult.unmappedFields
+        };
+
+        // マッピングされたデータを追加
+        mappingResult.mappings.forEach(mapping => {
+            enhancedData.formData[mapping.fieldName] = {
+                value: mapping.value,
+                source: mapping.source,
+                confidence: mapping.confidence
+            };
+        });
+
+        // ファイルに保存
+        fs.writeFileSync(filePath, JSON.stringify(enhancedData, null, 2), 'utf8');
+        
+        sendLog(`拡張JSONを保存しました: ${fileName}`, 'success');
+
+        return {
+            success: true,
+            filePath: filePath,
+            fileName: fileName,
+            data: enhancedData
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
 app.get('/events', (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -1131,18 +1369,34 @@ app.post('/upload', upload.single('jsonFile'), (req, res) => {
     }
 });
 
-app.post('/execute', async (req, res) => {
+// 新しいexecuteエンドポイント（JSONとPDFファイルを受け取る）
+app.post('/execute', upload.fields([
+    { name: 'jsonFile', maxCount: 1 },
+    { name: 'pdfFile', maxCount: 1 }
+]), async (req, res) => {
     try {
-        const { data } = req.body;
-        
-        if (!data) {
-            sendLog('JSONデータが含まれていません', 'error');
-            return res.status(400).json({ error: 'JSONデータが含まれていません' });
+        // ファイルの存在確認
+        if (!req.files || !req.files.jsonFile || !req.files.pdfFile) {
+            sendLog('JSONファイルとPDFファイルの両方が必要です', 'error');
+            return res.status(400).json({ error: 'JSONファイルとPDFファイルの両方が必要です' });
         }
+
+        const jsonFile = req.files.jsonFile[0];
+        const pdfFile = req.files.pdfFile[0];
+
+        // JSONファイルを読み込み
+        sendLog('JSONファイルを読み込んでいます...');
+        const jsonData = JSON.parse(fs.readFileSync(jsonFile.path, 'utf8'));
+        
+        // PDFファイルを解析
+        sendLog('PDFファイルを解析しています...');
+        const pdfResult = await extractResumeData(pdfFile.path, {
+            log: (message, type) => sendLog(`PDF: ${message}`, type)
+        });
 
         // 新しい抽出機能を使用
         sendLog('求人名の抽出を開始しています...');
-        const extractionResult = extractJobNameFromComplexFormat(data);
+        const extractionResult = extractJobNameFromComplexFormat(jsonData);
         
         if (!extractionResult.success) {
             sendLog(`求人名の抽出に失敗しました: ${extractionResult.errors.join(', ')}`, 'error');
@@ -1316,6 +1570,32 @@ app.post('/execute', async (req, res) => {
                 // 結果をファイルに保存
                 const savedFile = await saveFormAnalysisToFile(formAnalysisResult, matchResult.matchedJob);
                 formAnalysisResult.savedFile = savedFile;
+                
+                // PDF解析結果と必須項目をマッピング
+                sendLog('PDF解析結果と必須項目をマッピングしています...', 'info');
+                const mappingResult = await mapPdfDataToRequiredFields(
+                    formAnalysisResult, 
+                    pdfResult, 
+                    extractionResult
+                );
+                
+                if (mappingResult.success) {
+                    sendLog(`データマッピング完了: ${mappingResult.mappedFields}個の項目をマッピング`, 'success');
+                    
+                    // 拡張JSONを生成
+                    const enhancedJson = await generateEnhancedJson(
+                        jsonData, 
+                        pdfResult, 
+                        mappingResult, 
+                        matchResult.matchedJob
+                    );
+                    
+                    formAnalysisResult.pdfAnalysis = pdfResult;
+                    formAnalysisResult.dataMapping = mappingResult;
+                    formAnalysisResult.enhancedJson = enhancedJson;
+                } else {
+                    sendLog(`データマッピングに失敗: ${mappingResult.error}`, 'error');
+                }
             } else {
                 sendLog(`フォーム解析に失敗: ${formAnalysisResult.error}`, 'error');
             }
