@@ -3,262 +3,379 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPAツール</title>
+    <title>求人照合RPAツール</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
-            padding: 20px;
-            color: #333;
-        }
-
-        .container {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 1200px;
             margin: 0 auto;
-        }
-
-        h1 {
-            font-size: 24px;
-            font-weight: 500;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .control-panel {
-            background: white;
-            border: 1px solid #ddd;
             padding: 20px;
-            margin-bottom: 20px;
+            background-color: #f5f5f5;
         }
-
-        .file-section {
-            margin-bottom: 15px;
-        }
-
-        .file-input-wrapper {
-            display: inline-block;
-        }
-
-        input[type="file"] {
-            padding: 5px;
-            border: 1px solid #ccc;
+        
+        .container {
             background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
-        .file-name {
-            display: inline-block;
-            margin-left: 10px;
-            color: #666;
-            font-size: 14px;
-        }
-
-        .button-group {
-            margin-top: 15px;
-        }
-
-        button {
-            padding: 8px 20px;
-            margin-right: 10px;
-            background: white;
-            border: 1px solid #333;
+        
+        h1 {
             color: #333;
-            cursor: pointer;
-            font-size: 14px;
+            text-align: center;
+            margin-bottom: 30px;
         }
-
-        button:hover:not(:disabled) {
-            background: #333;
+        
+        .upload-section {
+            border: 2px dashed #ddd;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        
+        .upload-section.dragover {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+        
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        
+        button {
+            background-color: #007bff;
             color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
         }
-
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
         button:disabled {
-            opacity: 0.3;
+            background-color: #6c757d;
             cursor: not-allowed;
         }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
         }
-
-        .log-container, .results-container {
-            background: white;
-            border: 1px solid #ddd;
-            height: 400px;
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
         }
-
-        .section-header {
-            padding: 10px 15px;
-            background: #fafafa;
-            border-bottom: 1px solid #ddd;
-            font-weight: 500;
-            font-size: 14px;
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
-
-        .log-content {
-            height: calc(100% - 40px);
-            overflow-y: auto;
-            padding: 10px 15px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.6;
+        
+        .status.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
         }
-
-        .log-entry {
-            margin-bottom: 5px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .log-entry.info {
-            color: #666;
-        }
-
-        .log-entry.success {
-            color: #000;
-            font-weight: 500;
-        }
-
-        .log-entry.error {
-            color: #d00;
-        }
-
-        .results-content {
-            height: calc(100% - 40px);
-            overflow-y: auto;
+        
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
             padding: 15px;
-        }
-
-        .result-section {
-            margin-bottom: 20px;
-        }
-
-        .result-section h3 {
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
             font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #eee;
         }
-
-        .result-item {
-            padding: 5px 0;
-            font-size: 13px;
-            border-bottom: 1px dotted #eee;
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 2px 0;
         }
-
-        .result-item:last-child {
-            border-bottom: none;
+        
+        .log-entry.info {
+            color: #333;
         }
-
-        .exact-match {
-            background: #f0f0f0;
-            padding: 5px 8px;
-            margin: 2px 0;
+        
+        .log-entry.success {
+            color: #28a745;
+            font-weight: bold;
         }
-
-        .partial-match {
-            padding: 5px 8px;
-            margin: 2px 0;
+        
+        .log-entry.error {
+            color: #dc3545;
+            font-weight: bold;
         }
-
-        .no-match {
-            color: #999;
-            padding: 5px 8px;
-            margin: 2px 0;
+        
+        .log-entry.warning {
+            color: #ffc107;
+            font-weight: bold;
         }
-
-        .status-bar {
-            background: white;
-            border: 1px solid #ddd;
-            padding: 10px 15px;
+        
+        .results {
             margin-top: 20px;
-            font-size: 13px;
-            color: #666;
+        }
+        
+        .result-section {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .result-section h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        .result-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 5px;
+            border-left: 4px solid #6c757d;
+        }
+        
+        .result-item.exact-match {
+            background-color: #d4edda;
+            border-left-color: #28a745;
+        }
+        
+        .result-item.partial-match {
+            background-color: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        
+        .result-item.no-match {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        
+        .extraction-details {
+            background-color: #e3f2fd;
+            border-left-color: #2196f3;
+        }
+        
+        .safety-info {
+            background-color: #f3e5f5;
+            border-left-color: #9c27b0;
+        }
+        
+        .available-jobs {
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .job-item {
+            padding: 5px;
+            margin: 2px 0;
+            background-color: white;
+            border-radius: 3px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background-color: #28a745;
+            transition: width 0.3s ease;
+        }
+        
+        .confidence-fill.medium {
+            background-color: #ffc107;
+        }
+        
+        .confidence-fill.low {
+            background-color: #dc3545;
+        }
+        
+        .error-details {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .alternatives {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>RPAツール - 求人照合システム</h1>
+        <h1>求人照合RPAツール (安全性強化版)</h1>
         
-        <div class="control-panel">
-            <div class="file-section">
-                <div class="file-input-wrapper">
-                    <input type="file" id="jsonFile" accept=".json">
-                </div>
-                <span class="file-name" id="fileName"></span>
+        <div class="upload-section" id="uploadSection">
+            <p>JSONファイルをドラッグ&ドロップするか、ファイルを選択してください</p>
+            <input type="file" id="fileInput" accept=".json" />
+            <div id="fileInfo"></div>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <button id="executeBtn" disabled>実行</button>
+        <button id="closeBtn">ブラウザを閉じる</button>
+        
+        <div class="results" id="results">
+            <div class="result-section">
+                <h3>抽出情報</h3>
+                <div id="extractionDetails"></div>
             </div>
             
-            <div class="button-group">
-                <button id="executeBtn">実行</button>
-                <button id="closeBtn">終了</button>
-                <button id="clearBtn">クリア</button>
+            <div class="result-section">
+                <h3>入力された求人名</h3>
+                <div id="inputJob"></div>
+            </div>
+            
+            <div class="result-section">
+                <h3>マッチング結果</h3>
+                <div id="matchResult"></div>
+            </div>
+            
+            <div class="result-section">
+                <h3>利用可能な募集職種</h3>
+                <div id="availableJobs"></div>
             </div>
         </div>
-
-        <div class="main-content">
-            <div class="log-container">
-                <div class="section-header">実行ログ</div>
-                <div class="log-content" id="logContent"></div>
-            </div>
-
-            <div class="results-container">
-                <div class="section-header">判定結果</div>
-                <div class="results-content" id="resultsContent">
-                    <div class="result-section">
-                        <h3>入力求人名</h3>
-                        <div id="inputJob"></div>
-                    </div>
-                    <div class="result-section">
-                        <h3>判定結果</h3>
-                        <div id="matchResult"></div>
-                    </div>
-                    <div class="result-section">
-                        <h3>募集職種一覧</h3>
-                        <div id="availableJobs"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="status-bar" id="statusBar">待機中</div>
+        
+        <div class="log" id="log"></div>
     </div>
 
     <script>
-        const jsonFileInput = document.getElementById('jsonFile');
-        const fileNameDisplay = document.getElementById('fileName');
+        let uploadedData = null;
+        let eventSource = null;
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInfo = document.getElementById('fileInfo');
+        const status = document.getElementById('status');
         const executeBtn = document.getElementById('executeBtn');
         const closeBtn = document.getElementById('closeBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const logContent = document.getElementById('logContent');
-        const statusBar = document.getElementById('statusBar');
+        const log = document.getElementById('log');
+        const extractionDetailsDiv = document.getElementById('extractionDetails');
         const inputJobDiv = document.getElementById('inputJob');
         const matchResultDiv = document.getElementById('matchResult');
         const availableJobsDiv = document.getElementById('availableJobs');
 
-        let uploadedData = null;
-        let eventSource = null;
+        // ドラッグ&ドロップ機能
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
 
-        function addLog(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString('ja-JP');
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            entry.textContent = `[${timestamp}] ${message}`;
-            logContent.appendChild(entry);
-            logContent.scrollTop = logContent.scrollHeight;
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        async function handleFile(file) {
+            if (!file.name.endsWith('.json')) {
+                updateStatus('JSONファイルを選択してください', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('jsonFile', file);
+
+            try {
+                updateStatus('ファイルをアップロード中...', 'info');
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    uploadedData = result.data;
+                    updateStatus('ファイルが正常にアップロードされました', 'success');
+                    fileInfo.innerHTML = `<strong>ファイル名:</strong> ${file.name}<br><strong>サイズ:</strong> ${file.size} bytes`;
+                    executeBtn.disabled = false;
+                    
+                    // アップロードされたデータの形式を表示
+                    displayUploadedDataInfo(uploadedData);
+                } else {
+                    updateStatus(`エラー: ${result.error}`, 'error');
+                    executeBtn.disabled = true;
+                }
+            } catch (error) {
+                updateStatus(`アップロードエラー: ${error.message}`, 'error');
+                executeBtn.disabled = true;
+            }
         }
 
-        function updateStatus(message) {
-            statusBar.textContent = message;
+        function displayUploadedDataInfo(data) {
+            let info = '<div class="result-item"><strong>アップロードされたデータ形式:</strong><br>';
+            
+            if (data.name) {
+                info += `<strong>従来形式:</strong> name フィールド = "${data.name}"`;
+            } else if (data.calib && data.calib.record && data.calib.record.ra_memo_raw) {
+                info += `<strong>新形式:</strong> calib.record.ra_memo_raw<br>`;
+                info += `<strong>内容:</strong> "${data.calib.record.ra_memo_raw}"`;
+            } else {
+                info += '<strong>不明な形式:</strong> 認識可能なフィールドが見つかりません';
+            }
+            
+            info += '</div>';
+            extractionDetailsDiv.innerHTML = info;
+        }
+
+        function updateStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        function addLog(message, level = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${level}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
         }
 
         function clearResults() {
@@ -270,92 +387,221 @@
         function displayResult(result) {
             clearResults();
             
+            // 抽出詳細の表示
+            if (result.extractionDetails) {
+                const details = result.extractionDetails;
+                let extractionHtml = '<div class="result-item extraction-details">';
+                extractionHtml += `<strong>抽出方法:</strong> ${details.method}<br>`;
+                extractionHtml += `<strong>信頼度:</strong> ${details.confidence}%<br>`;
+                
+                // 信頼度バー
+                const confidenceClass = details.confidence >= 90 ? 'high' : details.confidence >= 70 ? 'medium' : 'low';
+                extractionHtml += `<div class="confidence-bar">`;
+                extractionHtml += `<div class="confidence-fill ${confidenceClass}" style="width: ${details.confidence}%"></div>`;
+                extractionHtml += `</div>`;
+                
+                if (details.originalData) {
+                    extractionHtml += `<strong>元データ:</strong> "${details.originalData}"<br>`;
+                }
+                
+                if (details.warnings && details.warnings.length > 0) {
+                    extractionHtml += `<strong>警告:</strong><br>`;
+                    details.warnings.forEach(warning => {
+                        extractionHtml += `• ${warning}<br>`;
+                    });
+                }
+                
+                extractionHtml += '</div>';
+                extractionDetailsDiv.innerHTML = extractionHtml;
+            }
+            
+            // 入力された求人名
             inputJobDiv.innerHTML = `<div class="result-item">${result.inputJobName}</div>`;
             
+            // マッチング結果の詳細表示
+            let matchHtml = '';
+            
             if (result.matchType === 'exact') {
-                matchResultDiv.innerHTML = `
+                matchHtml = `
                     <div class="result-item exact-match">
                         <strong>完全一致</strong><br>
-                        募集職種: ${result.matchedJob}
-                    </div>`;
-            } else if (result.matchType === 'partial') {
-                matchResultDiv.innerHTML = `
-                    <div class="result-item partial-match">
-                        <strong>部分一致</strong><br>
                         募集職種: ${result.matchedJob}<br>
-                        <small style="color: #666;">
-                            「${result.inputJobName}」が「${result.matchedJob}」に含まれています
-                        </small>
+                        <strong>信頼度:</strong> ${result.confidence || 100}%
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${result.confidence || 100}%"></div>
+                        </div>
+                        <small style="color: #155724;">文字通り完全に一致しています</small>
+                    </div>`;
+            } else if (result.matchType === 'normalized_exact') {
+                matchHtml = `
+                    <div class="result-item exact-match">
+                        <strong>正規化後完全一致</strong><br>
+                        募集職種: ${result.matchedJob}<br>
+                        <strong>信頼度:</strong> ${result.confidence || 95}%
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${result.confidence || 95}%"></div>
+                        </div>
+                        <small style="color: #155724;">スペースや記号を統一後に完全一致しています</small>
+                    </div>`;
+            } else if (result.matchType === 'core_exact') {
+                matchHtml = `
+                    <div class="result-item exact-match">
+                        <strong>装飾除去後完全一致</strong><br>
+                        募集職種: ${result.matchedJob}<br>
+                        <strong>信頼度:</strong> ${result.confidence || 90}%
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${result.confidence || 90}%"></div>
+                        </div>
+                        <small style="color: #155724;">装飾文字（【】など）を除去後に完全一致しています</small>
+                    </div>`;
+            } else if (result.matchType === 'strict_subset') {
+                matchHtml = `
+                    <div class="result-item partial-match">
+                        <strong>厳格な部分一致（拒否）</strong><br>
+                        募集職種: ${result.matchedJob}<br>
+                        <strong>信頼度:</strong> ${result.confidence || 85}% → 0% (拒否)
+                        <div class="confidence-bar">
+                            <div class="confidence-fill low" style="width: 0%"></div>
+                        </div>
+                        <small style="color: #856404;">部分一致を検出しましたが、安全性のため拒否されました</small>
                     </div>`;
             } else {
-                matchResultDiv.innerHTML = `
+                matchHtml = `
                     <div class="result-item no-match">
                         <strong>該当なし</strong><br>
                         <small style="color: #999;">
-                            「${result.inputJobName}」に一致する募集職種が見つかりませんでした
+                            「${result.inputJobName}」に厳格な条件でマッチする募集職種が見つかりませんでした
                         </small>
                     </div>`;
+                
+                // エラー詳細の表示
+                if (result.errors && result.errors.length > 0) {
+                    matchHtml += '<div class="error-details"><strong>エラー詳細:</strong><br>';
+                    result.errors.forEach(error => {
+                        matchHtml += `• ${error}<br>`;
+                    });
+                    matchHtml += '</div>';
+                }
+                
+                // 代替候補の表示
+                if (result.alternatives && result.alternatives.length > 0) {
+                    matchHtml += '<div class="alternatives"><strong>類似候補:</strong><br>';
+                    result.alternatives.forEach(alt => {
+                        matchHtml += `• ${alt}<br>`;
+                    });
+                    matchHtml += '</div>';
+                }
             }
             
-            if (result.availableJobs && result.availableJobs.length > 0) {
-                const availableTitle = document.createElement('div');
-                availableTitle.innerHTML = '<strong style="color: #333;">現在の募集職種:</strong>';
-                availableJobsDiv.appendChild(availableTitle);
+            // マッチング詳細情報の表示
+            if (result.details && result.details.checkedJobs) {
+                matchHtml += '<div class="result-item safety-info">';
+                matchHtml += '<strong>マッチング詳細:</strong><br>';
+                matchHtml += `<strong>正規化後:</strong> "${result.details.normalizedExtracted}"<br>`;
+                matchHtml += `<strong>装飾除去後:</strong> "${result.details.coreExtracted}"<br>`;
+                matchHtml += `<strong>チェック済み求人数:</strong> ${result.details.checkedJobs.length}件<br>`;
                 
-                result.availableJobs.forEach((job, index) => {
-                    const item = document.createElement('div');
-                    item.className = 'result-item';
-                    item.style.borderLeft = '3px solid #ddd';
-                    item.style.paddingLeft = '8px';
-                    item.style.marginTop = '5px';
-                    item.innerHTML = `${index + 1}. ${job}`;
-                    availableJobsDiv.appendChild(item);
+                // 全マッチの概要表示
+                if (result.details.allMatches && result.details.allMatches.length > 0) {
+                    matchHtml += `<strong>マッチした求人:</strong> ${result.details.allMatches.length}件<br>`;
+                    
+                    // マッチタイプ別の集計
+                    const matchTypeCount = {};
+                    result.details.allMatches.forEach(match => {
+                        matchTypeCount[match.type] = (matchTypeCount[match.type] || 0) + 1;
+                    });
+                    
+                    Object.entries(matchTypeCount).forEach(([type, count]) => {
+                        const typeNames = {
+                            'exact': '完全一致',
+                            'normalized_exact': '正規化後一致',
+                            'core_exact': '装飾除去後一致',
+                            'strict_subset': '部分一致'
+                        };
+                        matchHtml += `• ${typeNames[type] || type}: ${count}件<br>`;
+                    });
+                }
+                
+                if (result.details.checkedJobs.length > 0) {
+                    matchHtml += '<details style="margin-top: 10px;"><summary>詳細なチェック結果</summary>';
+                    matchHtml += '<div style="max-height: 200px; overflow-y: auto; margin-top: 5px;">';
+                    result.details.checkedJobs.forEach((jobCheck, index) => {
+                        const statusColor = jobCheck.confidence > 0 ? '#28a745' : '#6c757d';
+                        const isMatched = jobCheck.confidence > 0;
+                        matchHtml += `<div style="border-left: 3px solid ${statusColor}; padding-left: 8px; margin: 5px 0; ${isMatched ? 'background-color: #f8f9fa;' : ''}">`;
+                        matchHtml += `<strong>${index + 1}. ${jobCheck.original}</strong>`;
+                        if (isMatched) {
+                            matchHtml += ` <span style="color: ${statusColor}; font-weight: bold;">✓ MATCH</span>`;
+                        }
+                        matchHtml += `<br>`;
+                        matchHtml += `正規化: "${jobCheck.normalized}"<br>`;
+                        matchHtml += `装飾除去: "${jobCheck.core}"<br>`;
+                        matchHtml += `結果: ${jobCheck.matchType || 'no_match'} (${jobCheck.confidence}%)`;
+                        matchHtml += `</div>`;
+                    });
+                    matchHtml += '</div></details>';
+                }
+                matchHtml += '</div>';
+            }
+            
+            // 複数マッチの危険性警告
+            if (result.alternatives && result.alternatives.length > 1) {
+                matchHtml += '<div class="result-item" style="background-color: #f8d7da; border-left-color: #dc3545;">';
+                matchHtml += '<strong>🚨 複数マッチ検出（危険）:</strong><br>';
+                matchHtml += `${result.alternatives.length}件の求人がマッチしました。安全性のため処理を停止しました。<br><br>`;
+                matchHtml += '<strong>マッチした求人:</strong><br>';
+                result.alternatives.forEach((alt, index) => {
+                    matchHtml += `${index + 1}. ${alt}<br>`;
                 });
+                matchHtml += '<br><small style="color: #721c24;">複数の求人にマッチする場合、間違った求人に応募する危険性があるため、手動で確認してください。</small>';
+                matchHtml += '</div>';
+            }
+            
+            // 警告の表示
+            if (result.warnings && result.warnings.length > 0) {
+                matchHtml += '<div class="result-item" style="background-color: #fff3cd; border-left-color: #ffc107;">';
+                matchHtml += '<strong>警告:</strong><br>';
+                result.warnings.forEach(warning => {
+                    matchHtml += `• ${warning}<br>`;
+                });
+                matchHtml += '</div>';
+            }
+            
+            matchResultDiv.innerHTML = matchHtml;
+            
+            // 利用可能な募集職種
+            if (result.availableJobs && result.availableJobs.length > 0) {
+                let jobsHtml = `<div class="available-jobs">`;
+                jobsHtml += `<strong>取得された募集職種 (${result.availableJobs.length}件):</strong><br>`;
+                result.availableJobs.forEach(job => {
+                    jobsHtml += `<div class="job-item">${job}</div>`;
+                });
+                jobsHtml += '</div>';
+                availableJobsDiv.innerHTML = jobsHtml;
             }
         }
 
-        jsonFileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                fileNameDisplay.textContent = file.name;
-                addLog(`ファイル選択: ${file.name}`);
-                
-                const formData = new FormData();
-                formData.append('jsonFile', file);
-
-                try {
-                    updateStatus('アップロード中...');
-                    const response = await fetch('/upload', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const result = await response.json();
-                    
-                    if (response.ok) {
-                        uploadedData = result.data;
-                        addLog('JSONファイルのアップロード完了', 'success');
-                        updateStatus('準備完了');
-                    } else {
-                        addLog(`エラー: ${result.error}`, 'error');
-                        updateStatus('エラー');
-                    }
-                } catch (error) {
-                    addLog(`アップロード失敗: ${error.message}`, 'error');
-                    updateStatus('エラー');
-                }
+        closeBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/close', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                addLog(result.message, 'success');
+            } catch (error) {
+                addLog(`エラー: ${error.message}`, 'error');
             }
         });
 
         executeBtn.addEventListener('click', async () => {
-            if (!uploadedData || !uploadedData.name) {
-                addLog('JSONファイルに求人名が含まれていません', 'error');
+            if (!uploadedData) {
+                addLog('JSONファイルがアップロードされていません', 'error');
                 return;
             }
 
             executeBtn.disabled = true;
             clearResults();
-            updateStatus('実行中...');
+            updateStatus('実行中...', 'info');
             addLog('処理を開始します');
 
             if (eventSource) {
@@ -373,14 +619,14 @@
                     displayResult(data.result);
                     addLog('判定完了', 'success');
                 } else if (data.type === 'complete') {
-                    updateStatus('完了');
+                    updateStatus('完了', 'success');
                     executeBtn.disabled = false;
                 }
             };
 
             eventSource.onerror = () => {
                 addLog('接続エラー', 'error');
-                updateStatus('エラー');
+                updateStatus('エラー', 'error');
                 executeBtn.disabled = false;
                 eventSource.close();
             };
@@ -398,46 +644,24 @@
                 
                 if (!response.ok) {
                     addLog(`実行エラー: ${result.error}`, 'error');
-                    updateStatus('エラー');
+                    if (result.details) {
+                        result.details.forEach(detail => {
+                            addLog(`詳細: ${detail}`, 'error');
+                        });
+                    }
+                    updateStatus('エラー', 'error');
                     executeBtn.disabled = false;
                 }
             } catch (error) {
-                addLog(`実行失敗: ${error.message}`, 'error');
-                updateStatus('エラー');
+                addLog(`通信エラー: ${error.message}`, 'error');
+                updateStatus('エラー', 'error');
                 executeBtn.disabled = false;
             }
         });
 
-        closeBtn.addEventListener('click', async () => {
-            closeBtn.disabled = true;
-            updateStatus('終了中...');
-            addLog('ブラウザを終了します');
-            
-            try {
-                const response = await fetch('/close', {
-                    method: 'POST'
-                });
-
-                const result = await response.json();
-                
-                if (response.ok) {
-                    addLog('ブラウザを終了しました', 'success');
-                    updateStatus('待機中');
-                } else {
-                    addLog(`終了エラー: ${result.error}`, 'error');
-                }
-            } catch (error) {
-                addLog(`終了失敗: ${error.message}`, 'error');
-            } finally {
-                closeBtn.disabled = false;
-            }
-        });
-
-        clearBtn.addEventListener('click', () => {
-            logContent.innerHTML = '';
-            clearResults();
-            addLog('ログとクリアしました');
-        });
+        // 初期化
+        addLog('求人照合RPAツール (安全性強化版) が起動しました');
+        addLog('新しいJSON書式に対応しています');
     </script>
 </body>
 </html>

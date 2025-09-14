@@ -1,0 +1,30 @@
+{
+  "recommendation_no_raw": "20250911-TEST4",
+  "kintone": {
+    "source": "kintone",
+    "fetched_at": "2025-09-11T12:30:00+09:00",
+    "record": {
+      "ats_type_1_raw": "HERP",
+      "browser_name_1_raw": "シークレットモード",
+      "company_name_raw": "（株）テストカンパニー",
+      "ats_url_1_raw": "https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw",
+      "ats_id_1_raw": null,
+      "ats_pw_1_raw": null,
+      "notes_1_raw": "・求人名が長すぎるエラーケース",
+      "ats_input_type_1_raw": "企業必須項目のみ＋PDF",
+      "ats_input_language_1_raw": "すべて日本語",
+      "pdf_processing_required_raw": "加工なし"
+    }
+  },
+  "calib": {
+    "source": "calib",
+    "fetched_at": "2025-09-11T12:30:00+09:00",
+    "record": {
+      "ra_memo_raw": "W送付【シニアマネジャー】フルスタックエンジニア（React/TypeScript/Node.js/Python/AWS/Docker/Kubernetes専門）【正社員・リモートワーク可・フレックスタイム制・副業OK・育児支援充実・研修制度完備】※現年収:800万円、希望年収:1000万円、最低希望年収:900万円",
+      "pdf_export": {
+        "performed_raw": true,
+        "file_path": "/downloads/calib/20250911-TEST4.pdf"
+      }
+    }
+  }
+} 
