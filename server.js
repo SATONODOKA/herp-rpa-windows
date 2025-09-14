@@ -1155,6 +1155,12 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
                         } else if (requiredName === '職務経歴書' && fieldName === '経歴') {
                             isMatch = false; // 逆方向も除外
                             console.log(`⏭️ フィールドマッチング除外: "${requiredField}" → "${field.name}" (経歴は除外)`);
+                        } else if (requiredName === '履歴書') {
+                            // 履歴書は完全一致のみ許可（部分一致による混線を防ぐ）
+                            isMatch = (fieldName === '履歴書');
+                            if (!isMatch) {
+                                console.log(`⏭️ フィールドマッチング除外: "${requiredField}" → "${field.name}" (履歴書は完全一致のみ)`);
+                            }
                         } else {
                             isMatch = fieldName.includes(requiredName) || requiredName.includes(fieldName);
                         }
@@ -1365,6 +1371,11 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 mapping.source = '自動同意設定（直接マッチ）';
                 mapping.confidence = 100;
                 console.log(`✅ 直接マッチング成功: "${field.name}" → "同意します"`);
+            } else if (field.name === '履歴書') {
+                mapping.value = 'ー';
+                mapping.source = '自動ファイル設定（直接マッチ）';
+                mapping.confidence = 100;
+                console.log(`✅ 直接マッチング成功: "${field.name}" → "ー" (ファイルアップロード前提)`);
             }
             
             // JSONファイルからの設定も確認（フォールバック）
