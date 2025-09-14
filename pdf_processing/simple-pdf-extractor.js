@@ -36,6 +36,8 @@ class SimplePDFExtractor {
             const ageResult = this.extractAgeFromText(data.text);
             const phoneResult = this.extractPhoneFromText(data.text);
             const emailResult = this.extractEmailFromText(data.text);
+            const recommendationCommentResult = this.extractRecommendationCommentFromText(data.text);
+            const careerSummaryResult = this.extractCareerSummaryFromText(data.text);
             
             return {
                 success: true,
@@ -45,7 +47,16 @@ class SimplePDFExtractor {
                 age: ageResult.age,
                 phone: phoneResult.phone,
                 email: emailResult.email,
-                confidence: Math.max(nameResult.confidence, ageResult.confidence, phoneResult.confidence, emailResult.confidence),
+                recommendationComment: recommendationCommentResult.comment,
+                careerSummary: careerSummaryResult.summary,
+                confidence: Math.max(
+                    nameResult.confidence, 
+                    ageResult.confidence, 
+                    phoneResult.confidence, 
+                    emailResult.confidence,
+                    recommendationCommentResult.confidence,
+                    careerSummaryResult.confidence
+                ),
                 method: 'pdf-parse-simple'
             };
             
@@ -419,6 +430,142 @@ class SimplePDFExtractor {
         
         return {
             email: emailCandidate,
+            confidence: confidence
+        };
+    }
+
+    /**
+     * テキストから推薦時コメントを抽出
+     */
+    extractRecommendationCommentFromText(text) {
+        console.log('\n🔍 テキストから推薦時コメントを抽出します...');
+        
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        let commentCandidate = null;
+        let confidence = 0;
+        
+        // 「推薦理由」セクションを探す
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            
+            // 推薦理由のラベルを検出
+            if (line.includes('推薦理由')) {
+                console.log(`📝 推薦理由ラベル発見: "${line}"`);
+                
+                // 推薦理由の後のコンテンツを収集
+                const commentLines = [];
+                let j = i + 1;
+                
+                // 「面談所感」が出現するまで、または適切な終了条件まで収集
+                while (j < lines.length) {
+                    const currentLine = lines[j];
+                    
+                    // 終了条件: 面談所感、転職理由、添付資料などが出現
+                    if (currentLine.includes('面談所感') || 
+                        currentLine.includes('転職理由') || 
+                        currentLine.includes('添付資料') ||
+                        currentLine.includes('キャリアサポート部')) {
+                        console.log(`📝 推薦理由セクション終了: "${currentLine}"`);
+                        break;
+                    }
+                    
+                    // 空行や短すぎる行はスキップしつつ、有効な内容を追加
+                    if (currentLine.length > 5) {
+                        commentLines.push(currentLine);
+                    }
+                    
+                    j++;
+                }
+                
+                if (commentLines.length > 0) {
+                    // 箇条書きや段落を統合
+                    commentCandidate = commentLines.join('\n');
+                    confidence = 90;
+                    console.log(`✅ 推薦時コメント抽出完了: ${commentLines.length}行`);
+                    console.log(`📝 内容プレビュー: "${commentCandidate.substring(0, 100)}..."`);
+                    break;
+                }
+            }
+        }
+        
+        if (!commentCandidate) {
+            console.log('⚠️ 推薦時コメントが見つかりませんでした');
+        }
+        
+        return {
+            comment: commentCandidate,
+            confidence: confidence
+        };
+    }
+
+    /**
+     * テキストから職務要約（経歴）を抽出
+     */
+    extractCareerSummaryFromText(text) {
+        console.log('\n🔍 テキストから職務要約（経歴）を抽出します...');
+        
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        let summaryCandidate = null;
+        let confidence = 0;
+        
+        // 「職務要約」セクションを探す
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            
+            // 職務要約のラベルを検出（■職務要約、職務要約、職歴要約など）
+            if (line.includes('職務要約') || line.includes('■職務要約') || 
+                line.includes('職歴要約') || line.includes('■職歴要約') || 
+                line.includes('経歴要約')) {
+                console.log(`📝 職務要約ラベル発見: "${line}"`);
+                
+                // 職務要約の後のコンテンツを収集
+                const summaryLines = [];
+                let j = i + 1;
+                
+                // 次のセクション（活かせる経験・知識・技術など）が出現するまで収集
+                while (j < lines.length) {
+                    const currentLine = lines[j];
+                    
+                    // 終了条件: 次のセクションヘッダー
+                    if (currentLine.includes('活かせる経験') || 
+                        currentLine.includes('■活かせる') ||
+                        currentLine.includes('スキル') ||
+                        currentLine.includes('資格') ||
+                        currentLine.includes('学歴') ||
+                        currentLine.includes('知識') ||
+                        currentLine.includes('技術') ||
+                        (currentLine.includes('■') && currentLine !== line)) {
+                        console.log(`📝 職務要約セクション終了: "${currentLine}"`);
+                        break;
+                    }
+                    
+                    // 有効な内容行を追加（短すぎる行は除外）
+                    if (currentLine.length > 10) {
+                        summaryLines.push(currentLine);
+                    }
+                    
+                    j++;
+                }
+                
+                if (summaryLines.length > 0) {
+                    // 段落を統合
+                    summaryCandidate = summaryLines.join('\n');
+                    confidence = 85;
+                    console.log(`✅ 職務要約抽出完了: ${summaryLines.length}行`);
+                    console.log(`📝 内容プレビュー: "${summaryCandidate.substring(0, 100)}..."`);
+                    break;
+                }
+            }
+        }
+        
+        if (!summaryCandidate) {
+            console.log('⚠️ 職務要約が見つかりませんでした');
+        }
+        
+        return {
+            summary: summaryCandidate,
             confidence: confidence
         };
     }

@@ -33,12 +33,30 @@ const storage = multer.diskStorage({
 const upload = multer({ 
     storage: storage,
     fileFilter: (req, file, cb) => {
-        if (file.fieldname === 'jsonFile' && file.mimetype === 'application/json') {
-            cb(null, true);
-        } else if (file.fieldname === 'pdfFile' && file.mimetype === 'application/pdf') {
-            cb(null, true);
+        console.log(`📁 ファイル受信: fieldname=${file.fieldname}, mimetype=${file.mimetype}, originalname=${file.originalname}`);
+        
+        if (file.fieldname === 'jsonFile') {
+            // JSONファイルは拡張子やMIMEタイプで判定
+            if (file.mimetype === 'application/json' || 
+                file.originalname.endsWith('.json') ||
+                file.mimetype === 'application/octet-stream') { // Blobの場合
+                cb(null, true);
+            } else {
+                console.log(`❌ JSONファイルの形式エラー: ${file.mimetype}`);
+                cb(new Error('JSONファイルが必要です'), false);
+            }
+        } else if (file.fieldname === 'pdfFile') {
+            // PDFファイルは拡張子やMIMEタイプで判定
+            if (file.mimetype === 'application/pdf' || 
+                file.originalname.endsWith('.pdf')) {
+                cb(null, true);
+            } else {
+                console.log(`❌ PDFファイルの形式エラー: ${file.mimetype}`);
+                cb(new Error('PDFファイルが必要です'), false);
+            }
         } else {
-            cb(new Error('不正なファイル形式です'), false);
+            console.log(`❌ 不正なフィールド名: ${file.fieldname}`);
+            cb(new Error(`不正なフィールド名: ${file.fieldname}`), false);
         }
     }
 });
@@ -1133,13 +1151,28 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 age: pdfResult.age,
                 phone: pdfResult.phone,
                 email: pdfResult.email,
+                recommendationComment: pdfResult.recommendationComment,
+                careerSummary: pdfResult.careerSummary,
                 confidence: pdfResult.confidence
             },
             raCommentData: {}
         };
 
         // デバッグ: PDFデータの内容をログ出力
-        sendLog(`PDF抽出データ: 氏名「${pdfResult.extractedName || '未検出'}」, フリガナ「${pdfResult.furigana || '未検出'}」, 年齢「${pdfResult.age || '未検出'}」, 電話「${pdfResult.phone || '未検出'}」, メール「${pdfResult.email || '未検出'}」`, 'info');
+        const extractedItems = [];
+        if (pdfResult.extractedName) extractedItems.push(`氏名「${pdfResult.extractedName}」`);
+        if (pdfResult.furigana) extractedItems.push(`ふりがな「${pdfResult.furigana}」`);
+        if (pdfResult.age) extractedItems.push(`年齢「${pdfResult.age}歳」`);
+        if (pdfResult.phone) extractedItems.push(`電話「${pdfResult.phone}」`);
+        if (pdfResult.email) extractedItems.push(`メール「${pdfResult.email}」`);
+        if (pdfResult.recommendationComment) extractedItems.push(`推薦コメント「${pdfResult.recommendationComment.substring(0, 30)}...」`);
+        if (pdfResult.careerSummary) extractedItems.push(`職務要約「${pdfResult.careerSummary.substring(0, 30)}...」`);
+        
+        if (extractedItems.length > 0) {
+            sendLog(`PDF解析完了: ${extractedItems.join(', ')}`, 'info');
+        } else {
+            sendLog('PDF解析完了: データが抽出されませんでした', 'warning');
+        }
         sendLog(`RAコメント: ${extractionResult.originalData || 'なし'}`, 'info');
 
         // 必須項目を取得（フロントエンドと同じ判定ロジックを使用）
@@ -1193,6 +1226,15 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 mapping.value = pdfResult.email;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.email ? pdfResult.confidence : 0;
+            } else if (field.name.includes('推薦') && field.name.includes('コメント')) {
+                // 推薦時コメントはPDFからの抽出を優先（既存のRAコメント処理より上位）
+                mapping.value = pdfResult.recommendationComment;
+                mapping.source = 'PDF-simple-extractor';
+                mapping.confidence = pdfResult.recommendationComment ? pdfResult.confidence : 0;
+            } else if (field.name.includes('経歴') || field.name.includes('職務') || (field.name.includes('職') && field.name.includes('歴'))) {
+                mapping.value = pdfResult.careerSummary;
+                mapping.source = 'PDF-simple-extractor';
+                mapping.confidence = pdfResult.careerSummary ? pdfResult.confidence : 0;
             }
 
             // RAコメントからマッピング（年収関連）
@@ -1223,15 +1265,15 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 }
             }
 
-            // 推薦時コメント
-            if (field.name.includes('推薦') && field.name.includes('コメント')) {
+            // 推薦時コメント（PDFからの抽出が失敗した場合のフォールバック）
+            if (field.name.includes('推薦') && field.name.includes('コメント') && !mapping.value) {
                 const raComment = extractionResult.originalData || '';
                 // 推薦理由セクションを抽出
                 const recommendationMatch = raComment.match(/推薦理由[\s\S]*?(?=面談所感|転職理由|添付資料|$)/);
                 if (recommendationMatch) {
                     mapping.value = recommendationMatch[0].replace(/推薦理由\s*/, '').trim();
-                    mapping.source = 'RAコメント';
-                    mapping.confidence = 95;
+                    mapping.source = 'RAコメント-fallback';
+                    mapping.confidence = 80; // PDFより低い信頼度
                 }
             }
 
@@ -1297,6 +1339,8 @@ async function generateEnhancedJson(originalJson, pdfResult, mappingResult, jobN
                     age: pdfResult.age,
                     phone: pdfResult.phone,
                     email: pdfResult.email,
+                    recommendationComment: pdfResult.recommendationComment,
+                    careerSummary: pdfResult.careerSummary,
                     confidence: pdfResult.confidence
                 },
                 mappingResult: {
@@ -1632,6 +1676,8 @@ app.post('/execute', upload.fields([
                         age: pdfResult.age,
                         phone: pdfResult.phone,
                         email: pdfResult.email,
+                        recommendationComment: pdfResult.recommendationComment,
+                        careerSummary: pdfResult.careerSummary,
                         confidence: pdfResult.confidence
                     };
                     formAnalysisResult.dataMapping = mappingResult;
