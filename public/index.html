@@ -1056,20 +1056,20 @@
             if (pdfAnalysis.phone) html += `<p><strong>電話番号:</strong> ${pdfAnalysis.phone}</p>`;
             if (pdfAnalysis.email) html += `<p><strong>メールアドレス:</strong> ${pdfAnalysis.email}</p>`;
             
-            // 推薦時コメント（長い場合は省略表示）
+            // 推薦時コメント（完全表示）
             if (pdfAnalysis.recommendationComment) {
                 const comment = pdfAnalysis.recommendationComment;
-                const displayComment = comment.length > 500 ? 
-                    comment.substring(0, 500) + '...' : 
+                const displayComment = comment.length > 1000 ? 
+                    comment.substring(0, 1000) + '...' : 
                     comment;
                 html += `<p><strong>推薦時コメント:</strong><br><span style="font-size: 0.9em; color: #666;">${displayComment.replace(/\n/g, '<br>')}</span></p>`;
             }
             
-            // 経歴（職務要約）（長い場合は省略表示）
+            // 経歴（職務要約）（完全表示）
             if (pdfAnalysis.careerSummary) {
                 const summary = pdfAnalysis.careerSummary;
-                const displaySummary = summary.length > 500 ? 
-                    summary.substring(0, 500) + '...' : 
+                const displaySummary = summary.length > 1000 ? 
+                    summary.substring(0, 1000) + '...' : 
                     summary;
                 html += `<p><strong>経歴（職務要約）:</strong><br><span style="font-size: 0.9em; color: #666;">${displaySummary.replace(/\n/g, '<br>')}</span></p>`;
             }

@@ -460,30 +460,39 @@ class SimplePDFExtractor {
                 // 「面談所感」が出現するまで、または適切な終了条件まで収集
                 while (j < lines.length) {
                     const currentLine = lines[j];
+                    console.log(`📝 処理中の行 ${j}: "${currentLine}"`);
                     
-                    // 終了条件: 面談所感、転職理由、添付資料などが出現
-                    if (currentLine.includes('面談所感') || 
-                        currentLine.includes('転職理由') || 
-                        currentLine.includes('添付資料') ||
-                        currentLine.includes('キャリアサポート部')) {
+                    // 終了条件: 面談所感、転職理由、添付資料などが出現（ただし、現在行も含める）
+                    const isEndCondition = currentLine.includes('面談所感') || 
+                                          currentLine.includes('転職理由') || 
+                                          currentLine.includes('添付資料') ||
+                                          currentLine.includes('キャリアサポート部');
+                    
+                    if (isEndCondition) {
                         console.log(`📝 推薦理由セクション終了: "${currentLine}"`);
                         break;
                     }
                     
-                    // 空行や短すぎる行はスキップしつつ、有効な内容を追加
-                    if (currentLine.length > 5) {
-                        commentLines.push(currentLine);
-                    }
+                    // すべての行を追加（空行も含める - 改行情報を保持）
+                    commentLines.push(currentLine);
+                    console.log(`📝 行を追加: "${currentLine}" (合計: ${commentLines.length}行)`);
                     
                     j++;
                 }
                 
                 if (commentLines.length > 0) {
+                    // 末尾の空行を除去
+                    while (commentLines.length > 0 && commentLines[commentLines.length - 1].trim() === '') {
+                        commentLines.pop();
+                    }
+                    
                     // 箇条書きや段落を統合
                     commentCandidate = commentLines.join('\n');
                     confidence = 90;
                     console.log(`✅ 推薦時コメント抽出完了: ${commentLines.length}行`);
                     console.log(`📝 内容プレビュー: "${commentCandidate.substring(0, 100)}..."`);
+                    console.log(`📝 最後の3行:`, commentLines.slice(-3));
+                    console.log(`📝 完全な内容:\n${commentCandidate}`);
                     break;
                 }
             }

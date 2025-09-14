@@ -124,12 +124,35 @@ function extractJobNameFromComplexFormat(data) {
             if (data.kintone && data.kintone.record) {
                 const atsInputType = data.kintone.record.ats_input_type_1_raw;
                 const additionalFields = data.kintone.record.additional_required_fields_raw;
+                const autoConsentFields = data.kintone.record.auto_consent_fields_raw;
                 
                 if (atsInputType && atsInputType.includes('追加指定項目あり') && additionalFields) {
                     extractionResult.additionalRequiredFields = Array.isArray(additionalFields) ? additionalFields : [];
                     if (extractionResult.additionalRequiredFields.length > 0) {
                         extractionResult.warnings.push(`追加必須項目が指定されています: ${extractionResult.additionalRequiredFields.join(', ')}`);
                     }
+                }
+                
+                // 同意項目の自動設定を抽出
+                console.log('🔍 autoConsentFields チェック:', {
+                    exists: !!autoConsentFields,
+                    type: typeof autoConsentFields,
+                    value: autoConsentFields
+                });
+                
+                if (autoConsentFields && typeof autoConsentFields === 'object') {
+                    extractionResult.autoConsentFields = autoConsentFields;
+                    const consentItems = Object.keys(autoConsentFields);
+                    console.log('🤝 同意項目自動設定:', {
+                        items: consentItems,
+                        values: autoConsentFields
+                    });
+                    if (consentItems.length > 0) {
+                        extractionResult.warnings.push(`同意項目自動設定: ${consentItems.join(', ')}`);
+                        console.log('✅ 同意項目設定完了:', autoConsentFields);
+                    }
+                } else {
+                    console.log('❌ autoConsentFields が見つからないか、オブジェクトではありません');
                 }
             }
             
@@ -767,7 +790,7 @@ async function clickRecommendationButton(page, targetJobName) {
 }
 
 // 推薦ページのフォーム項目を解析する関数
-async function analyzeRecommendationForm(page, jobName, additionalRequiredFields = [], raCommentFields = []) {
+async function analyzeRecommendationForm(page, jobName, additionalRequiredFields = [], raCommentFields = [], autoConsentFields = {}) {
     const analysisResult = {
         success: false,
         error: null,
@@ -784,7 +807,8 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
             raCommentFields: raCommentFields || [],
             appliedCount: 0,
             appliedFields: []
-        }
+        },
+        autoConsentFields: autoConsentFields || {}
     };
 
     try {
@@ -793,7 +817,11 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
         sendLog(`フォーム解析開始: ${analysisResult.pageUrl}`);
 
         // ページ内のフォーム項目を解析
-        const formData = await page.evaluate(() => {
+        console.log('🚀 page.evaluate実行前のautoConsentFields:', autoConsentFields);
+        const formData = await page.evaluate((autoConsentFields) => {
+            // autoConsentFieldsをwindowオブジェクトに設定してアクセス可能にする
+            console.log('🌐 page.evaluate内でのautoConsentFields:', autoConsentFields);
+            window.autoConsentFields = autoConsentFields;
             const fields = [];
             let companyName = null;
 
@@ -893,10 +921,29 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
                         fieldType = inputElement.type || inputElement.tagName.toLowerCase();
                     }
 
-                    // Unknown Fieldと不要項目（1,2,20,22番目）を除外し、名前が取得できたフィールドのみを追加
+                    // Unknown Fieldと不要項目（推薦元、職種）を除外し、名前が取得できたフィールドのみを追加
                     if (fieldName !== 'Unknown Field' && fieldName.trim() !== '' && 
-                        fieldName !== '推薦元' && fieldName !== '職種' &&
-                        fieldName !== '登録内容の確認' && fieldName !== '個人情報の取り扱いに同意します') {
+                        fieldName !== '推薦元' && fieldName !== '職種') {
+                        
+                        // 自動同意フィールドかどうかをチェック
+                        let isAutoConsent = false;
+                        let autoConsentValue = null;
+                        
+                        // フィールド名の類似性をチェック（部分一致）
+                        console.log(`🔍 同意フィールドチェック: "${fieldName}", autoConsentFields:`, window.autoConsentFields);
+                        for (const [consentFieldName, consentValue] of Object.entries(window.autoConsentFields || {})) {
+                            console.log(`  🔸 比較: "${fieldName}" vs "${consentFieldName}"`);
+                            if (fieldName.includes(consentFieldName) || consentFieldName.includes(fieldName)) {
+                                console.log(`  ✅ マッチ! ${fieldName} → ${consentValue}`);
+                                isAutoConsent = true;
+                                autoConsentValue = consentValue;
+                                // 同意フィールドはtextタイプとして扱う（チェックボックスではなく値を表示するため）
+                                fieldType = 'text';
+                                console.log(`  📝 タイプ変更: checkbox → text`);
+                                break;
+                            }
+                        }
+                        
                         fields.push({
                             index: index + 1,
                             name: fieldName,
@@ -906,7 +953,9 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
                             hasLabel: !!labelElement,
                             hasRequiredIndicator: !!requiredElement,
                             hasOptionalIndicator: !!optionalElement,
-                            hasInput: !!inputElement
+                            hasInput: !!inputElement,
+                            isAutoConsent: isAutoConsent,
+                            autoConsentValue: autoConsentValue
                         });
                     }
 
@@ -988,7 +1037,7 @@ async function analyzeRecommendationForm(page, jobName, additionalRequiredFields
                 totalElements: formElements.length,
                 labeledItems: labeledFormItems.length
             };
-        });
+        }, autoConsentFields);
 
         analysisResult.fields = formData.fields;
         analysisResult.companyName = formData.companyName;
@@ -1179,6 +1228,23 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
         const requiredFields = formAnalysisResult.fields.filter(field => field.required);
         
         sendLog(`必須項目 ${requiredFields.length}個をマッピング中...`, 'info');
+        console.log('🔍 必須項目一覧:', requiredFields.map(f => f.name));
+        console.log('🤝 同意項目設定:', {
+            exists: !!extractionResult.autoConsentFields,
+            type: typeof extractionResult.autoConsentFields,
+            value: extractionResult.autoConsentFields,
+            keys: extractionResult.autoConsentFields ? Object.keys(extractionResult.autoConsentFields) : []
+        });
+        
+        // 同意フィールドの存在確認
+        const consentFields = requiredFields.filter(f => 
+            f.name.includes('登録内容') || f.name.includes('個人情報')
+        );
+        console.log('🎯 検出された同意フィールド:', consentFields.map(f => ({
+            name: f.name,
+            type: f.type,
+            required: f.required
+        })));
         sendLog(`フォーム解析結果の全項目数: ${formAnalysisResult.fields ? formAnalysisResult.fields.length : 0}`, 'info');
         sendLog(`フォーム解析結果の構造: ${JSON.stringify(Object.keys(formAnalysisResult), null, 2)}`, 'info');
         
@@ -1205,40 +1271,85 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                 confidence: 0
             };
 
-            // PDFデータからマッピング（新しい抽出器の結果を使用）
-            if (field.name.includes('氏名') || field.name.includes('名前') || field.name.includes('応募者氏名')) {
+            // 同意項目の自動処理を最初にチェック（フィールド名による直接マッチング + JSONの設定）
+            console.log(`🔎 フィールド処理開始: "${field.name}" (type: ${field.type})`);
+            
+            // 直接フィールド名マッチング（確実な処理のため）
+            if (field.name === '登録内容に誤りはありません') {
+                mapping.value = 'はい';
+                mapping.source = '自動同意設定（直接マッチ）';
+                mapping.confidence = 100;
+                console.log(`✅ 直接マッチング成功: "${field.name}" → "はい"`);
+            } else if (field.name === 'エージェント様の個人情報の取り扱いについて') {
+                mapping.value = '同意します';
+                mapping.source = '自動同意設定（直接マッチ）';
+                mapping.confidence = 100;
+                console.log(`✅ 直接マッチング成功: "${field.name}" → "同意します"`);
+            }
+            
+            // JSONファイルからの設定も確認（フォールバック）
+            if (!mapping.value && extractionResult.autoConsentFields) {
+                console.log(`🔍 同意項目チェック開始: フィールド名="${field.name}"`);
+                console.log(`🔍 利用可能な同意設定:`, extractionResult.autoConsentFields);
+                
+                for (const [consentKey, consentValue] of Object.entries(extractionResult.autoConsentFields)) {
+                    console.log(`  🔸 設定項目: "${consentKey}" = "${consentValue}"`);
+                    
+                    // より正確なマッチング条件
+                    const isConsentMatch = 
+                        field.name === consentKey ||  // 完全一致
+                        (consentKey.includes('登録内容') && field.name.includes('登録内容')) ||
+                        (consentKey.includes('個人情報') && field.name.includes('個人情報'));
+                    
+                    console.log(`  🔸 マッチ判定: ${isConsentMatch ? '✅' : '❌'} (フィールド: "${field.name}", 設定: "${consentKey}")`);
+                    
+                    if (isConsentMatch) {
+                        mapping.value = consentValue;
+                        mapping.source = '自動同意設定';
+                        mapping.confidence = 100;
+                        sendLog(`同意項目自動設定: ${field.name} = ${consentValue}`, 'info');
+                        console.log(`✅ 同意項目マッピング成功: "${field.name}" → "${consentValue}"`);
+                        break;
+                    }
+                }
+            } else if (!mapping.value) {
+                console.log(`⚠️ autoConsentFields が存在しません:`, extractionResult.autoConsentFields);
+            }
+
+            // 同意項目で値が設定されていない場合のみ、PDFデータからマッピング
+            if (!mapping.value && (field.name.includes('氏名') || field.name.includes('名前') || field.name.includes('応募者氏名'))) {
                 mapping.value = pdfResult.extractedName;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.extractedName ? pdfResult.confidence : 0;
-            } else if (field.name.includes('ふりがな') || field.name.includes('フリガナ')) {
+            } else if (!mapping.value && (field.name.includes('ふりがな') || field.name.includes('フリガナ'))) {
                 mapping.value = pdfResult.furigana;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.furigana ? Math.min(pdfResult.confidence, 90) : 0;
-            } else if (field.name.includes('年齢')) {
+            } else if (!mapping.value && field.name.includes('年齢')) {
                 mapping.value = pdfResult.age ? `${pdfResult.age}歳` : null;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.age ? pdfResult.confidence : 0;
-            } else if (field.name.includes('電話') || field.name.includes('TEL') || field.name.includes('電話番号')) {
+            } else if (!mapping.value && (field.name.includes('電話') || field.name.includes('TEL') || field.name.includes('電話番号'))) {
                 mapping.value = pdfResult.phone;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.phone ? pdfResult.confidence : 0;
-            } else if (field.name.includes('メール') || field.name.includes('email') || field.name.includes('Email') || field.name.includes('メールアドレス')) {
+            } else if (!mapping.value && (field.name.includes('メール') || field.name.includes('email') || field.name.includes('Email') || field.name.includes('メールアドレス'))) {
                 mapping.value = pdfResult.email;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.email ? pdfResult.confidence : 0;
-            } else if (field.name.includes('推薦') && field.name.includes('コメント')) {
+            } else if (!mapping.value && field.name.includes('推薦') && field.name.includes('コメント')) {
                 // 推薦時コメントはPDFからの抽出を優先（既存のRAコメント処理より上位）
                 mapping.value = pdfResult.recommendationComment;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.recommendationComment ? pdfResult.confidence : 0;
-            } else if (field.name.includes('経歴') || field.name.includes('職務') || (field.name.includes('職') && field.name.includes('歴'))) {
+            } else if (!mapping.value && (field.name.includes('経歴') || field.name.includes('職務') || (field.name.includes('職') && field.name.includes('歴')))) {
                 mapping.value = pdfResult.careerSummary;
                 mapping.source = 'PDF-simple-extractor';
                 mapping.confidence = pdfResult.careerSummary ? pdfResult.confidence : 0;
             }
 
             // RAコメントからマッピング（年収関連）
-            if (field.name.includes('年収')) {
+            if (!mapping.value && field.name.includes('年収')) {
                 const raComment = extractionResult.originalData || '';
                 
                 if (field.name.includes('現在') || field.name.includes('現年収')) {
@@ -1266,7 +1377,7 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
             }
 
             // 推薦時コメント（PDFからの抽出が失敗した場合のフォールバック）
-            if (field.name.includes('推薦') && field.name.includes('コメント') && !mapping.value) {
+            if (!mapping.value && field.name.includes('推薦') && field.name.includes('コメント')) {
                 const raComment = extractionResult.originalData || '';
                 // 推薦理由セクションを抽出
                 const recommendationMatch = raComment.match(/推薦理由[\s\S]*?(?=面談所感|転職理由|添付資料|$)/);
@@ -1278,7 +1389,7 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
             }
 
             // その他希望条件（RAコメントの補足文言）
-            if (field.name.includes('その他希望条件') || field.name.includes('備考')) {
+            if (!mapping.value && (field.name.includes('その他希望条件') || field.name.includes('備考'))) {
                 const raComment = extractionResult.originalData || '';
                 const noteMatch = raComment.match(/【(.+?)】/);
                 if (noteMatch) {
@@ -1287,6 +1398,8 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                     mapping.confidence = 90;
                 }
             }
+
+
 
             if (mapping.value && mapping.confidence > 0) {
                 mappingResult.mappedFields++;
@@ -1636,7 +1749,8 @@ app.post('/execute', upload.fields([
                 page, 
                 matchResult.matchedJob, 
                 jsonRequiredFields,
-                extractionResult.raCommentFields
+                extractionResult.raCommentFields,
+                extractionResult.autoConsentFields
             );
             
             if (formAnalysisResult.success) {
