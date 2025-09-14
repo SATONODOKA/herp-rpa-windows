@@ -1059,8 +1059,8 @@
             // 推薦時コメント（長い場合は省略表示）
             if (pdfAnalysis.recommendationComment) {
                 const comment = pdfAnalysis.recommendationComment;
-                const displayComment = comment.length > 200 ? 
-                    comment.substring(0, 200) + '...' : 
+                const displayComment = comment.length > 500 ? 
+                    comment.substring(0, 500) + '...' : 
                     comment;
                 html += `<p><strong>推薦時コメント:</strong><br><span style="font-size: 0.9em; color: #666;">${displayComment.replace(/\n/g, '<br>')}</span></p>`;
             }
@@ -1068,8 +1068,8 @@
             // 経歴（職務要約）（長い場合は省略表示）
             if (pdfAnalysis.careerSummary) {
                 const summary = pdfAnalysis.careerSummary;
-                const displaySummary = summary.length > 200 ? 
-                    summary.substring(0, 200) + '...' : 
+                const displaySummary = summary.length > 500 ? 
+                    summary.substring(0, 500) + '...' : 
                     summary;
                 html += `<p><strong>経歴（職務要約）:</strong><br><span style="font-size: 0.9em; color: #666;">${displaySummary.replace(/\n/g, '<br>')}</span></p>`;
             }
