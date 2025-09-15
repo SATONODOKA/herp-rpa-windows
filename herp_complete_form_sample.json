@@ -1,0 +1,243 @@
+{
+  "_comment": "HERP ATS 完全フォーム入力用 JSON - 実際の18項目対応版",
+  "_description": "PDFから抽出された情報を基に、HERPフォームの全項目を自動入力するためのJSONファイル",
+  "_version": "1.0",
+  "_last_updated": "2025-09-14",
+
+  "basic_info": {
+    "recommendation_no": "20250914-001",
+    "target_url": "https://agent.herp.cloud/p/YOUR_FORM_ID",
+    "login_required": true,
+    "login_credentials": {
+      "username": "your_username",
+      "password": "your_password"
+    }
+  },
+
+  "extracted_data": {
+    "_comment": "PDFから抽出されたデータ（参考用）",
+    "candidate_name": "田中 健太",
+    "current_company": "株式会社フィンテックソリューションズ",
+    "age": "25歳",
+    "education": "早稲田大学 商学部 経営学科",
+    "phone": "080-1234-5678",
+    "email": "k.tanaka.sales@outlook.jp",
+    "recommendation_comment": "面談時に伺ったお話や印象から以下の様な場面で力を発揮されると感じられます。・豊富なIT業界での法人営業経験と実績を持ちて、金融業界でも即戦力として活躍が期待できます。・論理的思考力と高いコミュニケーション能力を備え、チームをリードする力をお持ちです。・新しい業界への挑戦意欲が高く、積極的に学習し成長される向上心の強い方です。・顧客視点での課題発見・解決提案力に優れ、信頼関係構築が得意な方です。お人柄も良く、今後のご活躍が期待される方ですので、ぜひ一度面接の機会頂戴できましたらお願いいたします。",
+    "resume_file": "自動ファイル設定（直接マッチ）",
+    "career_history": "新卒で入社したIT企業にて、SaaS製品の法人営業として6年間従事し、新規開拓から既存顧客のアップセルまで幅広い営業業務を経験してまいりました。チームリーダーとして営業戦略の立案やメンバー育成にも携わり、チーム売上前年比120%を達成いたしました。営業プロセスの効率化や顧客データ分析を通じて、持続的な成果創出に貢献してきました。これまでの経験で培った「顧客視点での課題発見・解決提案力」を活かし、金融業界において新たな価値創出に挑戦したいと考えています。",
+    "current_salary": "750万円",
+    "desired_salary": "850万円", 
+    "minimum_salary": "800万円",
+    "additional_conditions": "希望年収は仮のため面談で確認",
+    "content_agreement": "はい",
+    "privacy_agreement": "同意します"
+  },
+
+  "ats_form_mapping": {
+    "_comment": "=== HERPフォーム18項目完全対応マッピング ===",
+
+    "_item_01_name": "=== 1. 応募者氏名（必須） ===",
+    "input[placeholder='例) 採用 太郎']": "田中 健太",
+    "input[placeholder*='氏名']": "田中 健太",
+    "input[name*='name']": "田中 健太",
+
+    "_item_02_company": "=== 2. 現所属（必須） ===", 
+    "input[placeholder='例) 株式会社HERP']": "株式会社フィンテックソリューションズ",
+    "input[placeholder*='会社']": "株式会社フィンテックソリューションズ",
+    "input[name*='company']": "株式会社フィンテックソリューションズ",
+
+    "_item_03_age": "=== 3. 年齢（必須） ===",
+    "input[placeholder='例) 27']": "25",
+    "input[placeholder*='年齢']": "25",
+    "input[name*='age']": "25",
+
+    "_item_04_education": "=== 4. 最終学歴（必須） ===",
+    "input[placeholder='例) 〇〇大学人事学部採用学科']": "早稲田大学 商学部 経営学科",
+    "input[placeholder*='大学']": "早稲田大学 商学部 経営学科",
+    "input[name*='education']": "早稲田大学 商学部 経営学科",
+
+    "_item_05_phone": "=== 5. 電話番号（必須） ===",
+    "input[placeholder='例) 080-1234-5678']": "080-1234-5678",
+    "input[placeholder*='080']": "080-1234-5678",
+    "input[name*='phone']": "080-1234-5678",
+    "input[type='tel']": "080-1234-5678",
+
+    "_item_06_email": "=== 6. メールアドレス（必須） ===",
+    "input[placeholder='例) herp@herp.co.jp']": "k.tanaka.sales@outlook.jp",
+    "input[placeholder*='@']": "k.tanaka.sales@outlook.jp",
+    "input[name*='email']": "k.tanaka.sales@outlook.jp",
+    "input[type='email']": "k.tanaka.sales@outlook.jp",
+
+    "_item_07_recommendation": "=== 7. 推薦時コメント（必須） ===",
+    "textarea[placeholder^='先月まで株式会社']": "面談時に伺ったお話や印象から以下の様な場面で力を発揮されると感じられます。・豊富なIT業界での法人営業経験と実績を持ちて、金融業界でも即戦力として活躍が期待できます。・論理的思考力と高いコミュニケーション能力を備え、チームをリードする力をお持ちです。・新しい業界への挑戦意欲が高く、積極的に学習し成長される向上心の強い方です。・顧客視点での課題発見・解決提案力に優れ、信頼関係構築が得意な方です。お人柄も良く、今後のご活躍が期待される方ですので、ぜひ一度面接の機会頂戴できましたらお願いいたします。",
+    "textarea[placeholder*='推薦']": "面談時に伺ったお話や印象から以下の様な場面で力を発揮されると感じられます。・豊富なIT業界での法人営業経験と実績を持ちて、金融業界でも即戦力として活躍が期待できます。・論理的思考力と高いコミュニケーション能力を備え、チームをリードする力をお持ちです。・新しい業界への挑戦意欲が高く、積極的に学習し成長される向上心の強い方です。・顧客視点での課題発見・解決提案力に優れ、信頼関係構築が得意な方です。お人柄も良く、今後のご活躍が期待される方ですので、ぜひ一度面接の機会頂戴できましたらお願いいたします。",
+    "textarea[name*='recommendation']": "面談時に伺ったお話や印象から以下の様な場面で力を発揮されると感じられます。・豊富なIT業界での法人営業経験と実績を持ちて、金融業界でも即戦力として活躍が期待できます。・論理的思考力と高いコミュニケーション能力を備え、チームをリードする力をお持ちです。・新しい業界への挑戦意欲が高く、積極的に学習し成長される向上心の強い方です。・顧客視点での課題発見・解決提案力に優れ、信頼関係構築が得意な方です。お人柄も良く、今後のご活躍が期待される方ですので、ぜひ一度面接の機会頂戴できましたらお願いいたします。",
+
+    "_item_08_resume": "=== 8. 履歴書（必須・ファイルアップロード） ===",
+    "_resume_file_note": "フロントエンドで必ず履歴書ファイルをアップロード処理する",
+    "_resume_file_selector": "input[type='file'][accept*='pdf'], input[type='file'][name*='resume'], .file-upload-area",
+
+    "_item_09_job_history": "=== 9. 職務経歴書（任意・ファイルアップロード） ===",
+    "_job_history_file_note": "任意項目のため、ファイルがある場合のみアップロード",
+    "_job_history_file_selector": "input[type='file'][name*='career'], input[type='file'][name*='job_history']",
+
+    "_item_10_other_files": "=== 10. その他のファイル（任意） ===",
+    "_other_files_note": "ポートフォリオ等の追加ファイル（任意）",
+    "_other_files_selector": "input[type='file'][name*='other'], input[type='file'][name*='portfolio']",
+
+    "_item_11_career": "=== 11. 経歴（必須） ===",
+    "textarea[placeholder^='◯◯大学卒業後']": "新卒で入社したIT企業にて、SaaS製品の法人営業として6年間従事し、新規開拓から既存顧客のアップセルまで幅広い営業業務を経験してまいりました。チームリーダーとして営業戦略の立案やメンバー育成にも携わり、チーム売上前年比120%を達成いたしました。営業プロセスの効率化や顧客データ分析を通じて、持続的な成果創出に貢献してきました。これまでの経験で培った「顧客視点での課題発見・解決提案力」を活かし、金融業界において新たな価値創出に挑戦したいと考えています。",
+    "textarea[placeholder*='経歴']": "新卒で入社したIT企業にて、SaaS製品の法人営業として6年間従事し、新規開拓から既存顧客のアップセルまで幅広い営業業務を経験してまいりました。チームリーダーとして営業戦略の立案やメンバー育成にも携わり、チーム売上前年比120%を達成いたしました。営業プロセスの効率化や顧客データ分析を通じて、持続的な成果創出に貢献してきました。これまでの経験で培った「顧客視点での課題発見・解決提案力」を活かし、金融業界において新たな価値創出に挑戦したいと考えています。",
+    "textarea[name*='career']": "新卒で入社したIT企業にて、SaaS製品の法人営業として6年間従事し、新規開拓から既存顧客のアップセルまで幅広い営業業務を経験してまいりました。チームリーダーとして営業戦略の立案やメンバー育成にも携わり、チーム売上前年比120%を達成いたしました。営業プロセスの効率化や顧客データ分析を通じて、持続的な成果創出に貢献してきました。これまでの経験で培った「顧客視点での課題発見・解決提案力」を活かし、金融業界において新たな価値創出に挑戦したいと考えています。",
+
+    "_item_12_links": "=== 12. リンク（任意） ===",
+    "input[data-index='0']": "",
+    "input[data-index='1']": "",
+    "input[placeholder*='URL']": "",
+    "input[name*='link']": "",
+
+    "_item_13_current_salary": "=== 13. 現年収（必須） ===",
+    "input[placeholder='例) 500']": "750",
+    "input[placeholder*='現在']": "750",
+    "input[name*='current_salary']": "750",
+
+    "_item_14_desired_salary": "=== 14. 希望年収（必須） ===",
+    "input[placeholder='例) 600']": "850",
+    "input[placeholder*='希望']": "850", 
+    "input[name*='desired_salary']": "850",
+
+    "_item_15_minimum_salary": "=== 15. 希望年収（最低）（必須） ===",
+    "input[placeholder='例) 400']": "800",
+    "input[placeholder*='最低']": "800",
+    "input[name*='minimum_salary']": "800",
+
+    "_item_16_conditions": "=== 16. その他希望条件（必須） ===",
+    "textarea[placeholder^='例) ストックオプション']": "希望年収は仮のため面談で確認",
+    "textarea[placeholder*='希望']": "希望年収は仮のため面談で確認",
+    "textarea[name*='conditions']": "希望年収は仮のため面談で確認",
+
+    "_item_17_content_agreement": "=== 17. 登録内容に誤りはありません（必須・チェックボックス） ===",
+    "checkbox_登録内容に誤りはありません": true,
+
+    "_item_18_privacy_agreement": "=== 18. エージェント様の個人情報の取り扱いについて（必須・チェックボックス） ===", 
+    "checkbox_個人情報の取り扱いに同意します": true,
+    "checkbox_エージェント様の個人情報の取り扱いについて": true,
+
+    "_submit_button": "=== 送信ボタン ===",
+    "button[type='submit']": "click",
+    "button[class*='submit']": "click",
+    "input[type='submit']": "click"
+  },
+
+  "file_upload_instructions": {
+    "_comment": "ファイルアップロード処理の詳細指示",
+    
+    "resume_file": {
+      "required": true,
+      "item_number": 8,
+      "description": "履歴書ファイル（必須）",
+      "file_types": [".pdf", ".doc", ".docx"],
+      "max_size": "10MB",
+      "selector_patterns": [
+        "input[type='file'][accept*='pdf']",
+        "input[type='file'][name*='resume']", 
+        "input[type='file'][name*='rirekisho']",
+        ".file-upload-area input[type='file']"
+      ],
+      "upload_method": "direct_file_selection",
+      "note": "PDFから「ー」という結論が出ても、必ずフロントでファイルをアップロード"
+    },
+    
+    "job_history_file": {
+      "required": false,
+      "item_number": 9,
+      "description": "職務経歴書（任意）",
+      "file_types": [".pdf", ".doc", ".docx"],
+      "max_size": "10MB", 
+      "selector_patterns": [
+        "input[type='file'][name*='career']",
+        "input[type='file'][name*='job_history']",
+        "input[type='file'][name*='shokumu']"
+      ],
+      "upload_method": "conditional_upload"
+    },
+
+    "other_files": {
+      "required": false,
+      "item_number": 10,
+      "description": "その他のファイル（任意）",
+      "file_types": [".pdf", ".doc", ".docx", ".jpg", ".png"],
+      "max_size": "10MB",
+      "selector_patterns": [
+        "input[type='file'][name*='other']",
+        "input[type='file'][name*='portfolio']"
+      ],
+      "upload_method": "conditional_upload"
+    }
+  },
+
+  "field_validation": {
+    "required_fields": [
+      "応募者氏名", "現所属", "年齢", "最終学歴", "電話番号", 
+      "メールアドレス", "推薦時コメント", "履歴書", "経歴",
+      "現年収", "希望年収", "希望年収（最低）", "その他希望条件",
+      "登録内容に誤りはありません", "個人情報の取り扱いについて"
+    ],
+    "optional_fields": [
+      "職務経歴書", "その他のファイル", "リンク"
+    ],
+    "checkbox_fields": {
+      "item_17": {
+        "text": "登録内容に誤りはありません",
+        "expected_value": "はい",
+        "action": "check_checkbox"
+      },
+      "item_18": {
+        "text": "エージェント様の個人情報の取り扱いについて", 
+        "expected_value": "同意します",
+        "action": "check_checkbox"
+      }
+    }
+  },
+
+  "processing_order": {
+    "step_1_text_inputs": [
+      "応募者氏名", "現所属", "年齢", "最終学歴", 
+      "電話番号", "メールアドレス"
+    ],
+    "step_2_textareas": [
+      "推薦時コメント", "経歴", "その他希望条件"
+    ],
+    "step_3_salary_inputs": [
+      "現年収", "希望年収", "希望年収（最低）"
+    ],
+    "step_4_file_uploads": [
+      "履歴書", "職務経歴書", "その他のファイル"
+    ],
+    "step_5_optional_inputs": [
+      "リンク"
+    ],
+    "step_6_checkboxes": [
+      "登録内容に誤りはありません",
+      "エージェント様の個人情報の取り扱いについて"
+    ],
+    "step_7_submit": [
+      "送信ボタンクリック"
+    ]
+  },
+
+  "implementation_notes": {
+    "critical_points": [
+      "項目8の履歴書は、PDFで「ー」と判定されても必ずファイルアップロード処理を実行",
+      "項目17・18のチェックボックスは「はい」「同意します」の回答に基づき自動チェック",
+      "年収項目は数値のみ入力（「万円」は不要）",
+      "テキストエリアの文字数制限に注意（長文の場合は適切に調整）"
+    ],
+    "error_handling": [
+      "ファイルアップロード失敗時のリトライ機能",
+      "必須項目の入力漏れチェック",
+      "セレクタが見つからない場合の代替セレクタ使用",
+      "チェックボックスの状態確認"
+    ]
+  }
+} 
