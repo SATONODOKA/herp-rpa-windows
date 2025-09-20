@@ -1117,6 +1117,7 @@
             }
 
             executeBtn.disabled = true;
+            processingAborted = false; // 新しい処理開始時にリセット
             clearResults();
             updateStatus('実行中...', 'info');
             addLog('処理を開始します');
@@ -1773,6 +1774,19 @@
 
             // マッピングエラーチェック
             if (stepName === 'データマッピング' && result.mappingResult) {
+                // 必須項目マッピング失敗の重要エラーチェック
+                if (result.mappingResult.criticalError || (!result.mappingResult.success && result.mappingResult.unmappedFields && result.mappingResult.unmappedFields.length > 0)) {
+                    const unmappedFieldNames = result.mappingResult.unmappedFields ? 
+                        result.mappingResult.unmappedFields.map(f => f.fieldName).join(', ') : 
+                        '不明';
+                    showErrorPopup(
+                        '必須項目マッピング失敗',
+                        '必須項目のマッピングに失敗したため処理を停止します。',
+                        result.mappingResult.error || `未マッピング項目: ${unmappedFieldNames}`
+                    );
+                    return false;
+                }
+
                 if (!result.mappingResult.success) {
                     showErrorPopup(
                         'データマッピング失敗',

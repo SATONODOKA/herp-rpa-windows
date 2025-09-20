@@ -1594,6 +1594,25 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
             }
         }
 
+        // 必須項目のマッピング失敗チェック
+        if (mappingResult.unmappedFields.length > 0) {
+            const unmappedRequiredFields = mappingResult.unmappedFields.filter(field => 
+                field.fieldName && typeof field.fieldName === 'string'
+            );
+            
+            if (unmappedRequiredFields.length > 0) {
+                sendLog(`🚨 必須項目のマッピングに失敗しました: ${unmappedRequiredFields.map(f => f.fieldName).join(', ')}`, 'error');
+                return {
+                    success: false,
+                    error: `必須項目のマッピングに失敗: ${unmappedRequiredFields.map(f => f.fieldName).join(', ')}`,
+                    mappedFields: mappingResult.mappedFields,
+                    mappings: mappingResult.mappings,
+                    unmappedFields: mappingResult.unmappedFields,
+                    criticalError: true
+                };
+            }
+        }
+
         return mappingResult;
 
     } catch (error) {
@@ -2047,6 +2066,32 @@ app.post('/execute', upload.fields([
                     formAnalysisResult.enhancedJson = enhancedJson;
                 } else {
                     sendLog(`データマッピングに失敗: ${mappingResult.error}`, 'error');
+                    
+                    // 必須項目のマッピング失敗の場合は処理を停止
+                    if (mappingResult.criticalError) {
+                        sendLog('🚨 必須項目のマッピング失敗により処理を停止します', 'error');
+                        formAnalysisResult.criticalError = true;
+                        formAnalysisResult.errorMessage = mappingResult.error;
+                        formAnalysisResult.dataMapping = mappingResult;
+                        
+                        // ここで処理を停止（拡張JSON生成などは実行しない）
+                        const result = {
+                            inputJobName,
+                            extractionDetails: extractionResult,
+                            jobMatching: matchResult,
+                            matchedJob: matchResult.matchedJob,
+                            matchType: matchResult.matchType,
+                            formAnalysis: formAnalysisResult,
+                            mappingResult: mappingResult,  // 追加: マッピング結果を含める
+                            success: false,
+                            error: mappingResult.error,
+                            criticalError: true
+                        };
+                        
+                        res.json(result);
+                        await browser.close();
+                        return;
+                    }
                 }
             } else {
                 sendLog(`フォーム解析に失敗: ${formAnalysisResult.error}`, 'error');
@@ -2063,7 +2108,8 @@ app.post('/execute', upload.fields([
             warnings: matchResult.warnings,
             buttonClicked: clickResult.success,
             clickDetails: clickResult,
-            formAnalysis: formAnalysisResult
+            formAnalysis: formAnalysisResult,
+            mappingResult: formAnalysisResult.dataMapping || null  // マッピング結果を含める
         };
         
         sendEvent({ type: 'result', result });
