@@ -499,7 +499,11 @@
                 <button id="registerToHerpBtn" style="background-color: #28a745; font-size: 18px; padding: 15px 30px; margin-top: 10px;">
                     📝 HERPに登録する
                 </button>
+                <button id="errorCheckBtn" style="background-color: #007bff; font-size: 18px; padding: 15px 30px; margin-top: 10px; margin-left: 10px; display: none;">
+                    🔍 エラーチェックする
+                </button>
                 <div id="herpRegistrationStatus" style="margin-top: 10px; display: none;"></div>
+                <div id="errorCheckStatus" style="margin-top: 10px; display: none;"></div>
             </div>
         </div>
         
@@ -510,6 +514,7 @@
         let uploadedData = null;
         let uploadedPdf = null;
         let eventSource = null;
+        let herpRegistrationCompleted = false;
 
         const fileInput = document.getElementById('fileInput');
         const pdfInput = document.getElementById('pdfInput');
@@ -1225,9 +1230,13 @@
 
                 if (response.ok) {
                     updateHerpRegistrationStatus(`✅ HERPへの転記が完了しました！ (${result.filledFields}個の項目を転記)`, 'success');
+                    herpRegistrationCompleted = true;
+                    // エラーチェックボタンを表示
+                    document.getElementById('errorCheckBtn').style.display = 'inline-block';
                 } else {
                     const errorMsg = result.error || result.details || '不明なエラー';
                     updateHerpRegistrationStatus(`❌ 転記エラー: ${errorMsg}`, 'error');
+                    herpRegistrationCompleted = false;
                 }
             } catch (error) {
                 updateHerpRegistrationStatus(`❌ 通信エラー: ${error.message}`, 'error');
@@ -1242,6 +1251,78 @@
             statusDiv.textContent = message;
             statusDiv.className = `status ${type}`;
             statusDiv.style.display = 'block';
+        }
+
+        // エラーチェックボタンのイベントリスナー
+        document.getElementById('errorCheckBtn').addEventListener('click', async () => {
+            if (!herpRegistrationCompleted) {
+                updateErrorCheckStatus('先にHERP登録を完了してください。', 'error');
+                return;
+            }
+
+            if (!latestEnhancedData || !latestPdfFile) {
+                updateErrorCheckStatus('データが見つかりません。', 'error');
+                return;
+            }
+
+            const errorCheckBtn = document.getElementById('errorCheckBtn');
+            errorCheckBtn.disabled = true;
+            errorCheckBtn.textContent = '🔄 チェック中...';
+
+            try {
+                updateErrorCheckStatus('転記データのチェックを開始しています...', 'info');
+
+                const formData = new FormData();
+                formData.append('enhancedData', JSON.stringify(latestEnhancedData));
+
+                const response = await fetch('/error-check', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const contentType = response.headers.get('content-type');
+                let result;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    const textResponse = await response.text();
+                    updateErrorCheckStatus(`❌ サーバーエラー: 不正なレスポンス形式`, 'error');
+                    console.error('非JSONレスポンス:', textResponse);
+                    return;
+                }
+
+                if (response.ok) {
+                    if (result.hasErrors) {
+                        let errorMessage = `❌ ${result.errors.length}件の不一致が検出されました:`;
+                        result.errors.forEach((error, index) => {
+                            errorMessage += `\n\n${index + 1}. ${error.field}`;
+                            if (error.expected && error.actual) {
+                                errorMessage += `\n  期待値: "${error.expected}"\n  実際: "${error.actual}"`;
+                            }
+                        });
+                        updateErrorCheckStatus(errorMessage, 'error');
+                    } else {
+                        updateErrorCheckStatus(`✅ エラーチェック完了: 問題ありません！全ての項目が正しく転記されています。`, 'success');
+                    }
+                } else {
+                    const errorMsg = result.error || result.details || '不明なエラー';
+                    updateErrorCheckStatus(`❌ チェックエラー: ${errorMsg}`, 'error');
+                }
+            } catch (error) {
+                updateErrorCheckStatus(`❌ 通信エラー: ${error.message}`, 'error');
+            } finally {
+                errorCheckBtn.disabled = false;
+                errorCheckBtn.textContent = '🔍 エラーチェックする';
+            }
+        });
+
+        function updateErrorCheckStatus(message, type) {
+            const statusDiv = document.getElementById('errorCheckStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            statusDiv.style.whiteSpace = 'pre-wrap'; // 改行を表示
         }
 
         // 初期化

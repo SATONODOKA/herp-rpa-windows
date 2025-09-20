@@ -2181,6 +2181,66 @@ app.post('/herp-register', upload.single('pdfFile'), async (req, res) => {
     }
 });
 
+// エラーチェックエンドポイント
+app.post('/error-check', upload.none(), async (req, res) => {
+    try {
+        const enhancedDataString = req.body.enhancedData;
+        if (!enhancedDataString) {
+            sendLog('Enhanced JSONデータが要求で見つかりません', 'error');
+            return res.status(400).json({ error: 'Enhanced JSONデータが見つかりません' });
+        }
+
+        let enhancedData;
+        try {
+            enhancedData = JSON.parse(enhancedDataString);
+        } catch (parseError) {
+            sendLog(`Enhanced JSONデータのパースエラー: ${parseError.message}`, 'error');
+            return res.status(400).json({ error: `Enhanced JSONデータの解析に失敗しました: ${parseError.message}` });
+        }
+
+        // 現在のページがHERPの推薦フォームかチェック
+        if (!page || !browser) {
+            return res.status(400).json({ error: 'ブラウザが起動していません。' });
+        }
+
+        const currentUrl = await page.url();
+        if (!currentUrl.includes('herp.cloud')) {
+            return res.status(400).json({ error: 'HERPページが開かれていません。' });
+        }
+
+        sendLog('転記データのチェックを開始しています...', 'info');
+
+        // データ検証の実行
+        const checkResult = await verifyHerpFormData(page, enhancedData);
+
+        if (checkResult.hasErrors) {
+            sendLog(`❌ エラーが検出されました: ${checkResult.errors.length}件の不一致`, 'error');
+            res.json({
+                hasErrors: true,
+                errors: checkResult.errors,
+                checkedFields: checkResult.checkedFields,
+                message: 'データの不一致が検出されました'
+            });
+        } else {
+            sendLog('✅ エラーチェック完了: 全ての項目が正しく転記されています', 'success');
+            res.json({
+                hasErrors: false,
+                errors: [],
+                checkedFields: checkResult.checkedFields,
+                message: '全ての項目が正しく転記されています'
+            });
+        }
+
+    } catch (error) {
+        console.error('エラーチェックエラー:', error);
+        sendLog(`❌ エラーチェックエラー: ${error.message}`, 'error');
+        res.status(500).json({ 
+            error: 'エラーチェック中にエラーが発生しました',
+            details: error.message
+        });
+    }
+});
+
 app.post('/close', async (_, res) => {
     try {
         if (browser) {
@@ -2621,4 +2681,116 @@ async function fillHerpForm(page, enhancedData, pdfFile) {
         sendLog(`❌ HERP転記処理エラー: ${error.message}`, 'error');
         return fillResult;
     }
+}
+
+// HERPフォームのデータ検証関数
+async function verifyHerpFormData(page, enhancedData) {
+    const checkResult = {
+        hasErrors: false,
+        errors: [],
+        checkedFields: 0
+    };
+
+    try {
+        // フィールドマッピング（fillHerpFormと同じ）
+        const fieldMappings = {
+            '応募者氏名': 'input.text-field__input[placeholder*="採用 太郎"]',
+            '現所属': 'input.text-field__input[placeholder*="株式会社HERP"]',
+            '年齢': 'input.text-field__input[placeholder*="27"]',
+            '最終学歴': 'input.text-field__input[placeholder*="大学人事学部採用学科"]',
+            '電話番号': 'input.text-field__input[placeholder*="080-1234-5678"]',
+            'メールアドレス': 'input.text-field__input[placeholder*="herp@herp.co.jp"]',
+            '現年収': 'input.text-field__input[placeholder*="500"]',
+            '希望年収': 'input.text-field__input[placeholder*="600"]',
+            '希望年収（最低）': 'input.text-field__input[placeholder*="400"]',
+            '推薦時コメント': 'textarea.multiline-text-field__input[placeholder*="先月まで株式会社"]',
+            '経歴': 'textarea.multiline-text-field__input[placeholder*="大学卒業後"]',
+            'その他希望条件': 'textarea.multiline-text-field__input[placeholder*="ストックオプション"]',
+            'リンク1': 'input.text-field__input[placeholder*="github.com/xxx"][data-index="0"]',
+            'リンク2': 'input.text-field__input[placeholder*="github.com/xxx"][data-index="1"]'
+        };
+
+        // 各フィールドの値を確認
+        for (const [fieldName, fieldData] of Object.entries(enhancedData.formData)) {
+            if (!fieldData || typeof fieldData !== 'object') {
+                continue;
+            }
+
+            const selector = fieldMappings[fieldName];
+            if (!selector) {
+                continue;
+            }
+
+            try {
+                // フィールドが存在するか確認
+                const fieldExists = await page.$(selector);
+                if (!fieldExists) {
+                    continue;
+                }
+
+                // HERPフォームから現在の値を取得
+                const currentValue = await page.evaluate((sel) => {
+                    const element = document.querySelector(sel);
+                    return element ? element.value : null;
+                }, selector);
+
+                if (currentValue === null) {
+                    continue;
+                }
+
+                let expectedValue = fieldData.value;
+
+                // 年収フィールドの場合は数値のみを抽出
+                if (fieldName.includes('年収') && typeof expectedValue === 'string') {
+                    const numericMatch = expectedValue.match(/(\d+)/);
+                    if (numericMatch) {
+                        expectedValue = numericMatch[1];
+                    }
+                }
+
+                // 値を文字列に変換して比較
+                const expectedStr = String(expectedValue || '').trim();
+                const currentStr = String(currentValue || '').trim();
+
+                checkResult.checkedFields++;
+
+                // 値が異なる場合はエラーとして記録
+                if (expectedStr !== currentStr) {
+                    checkResult.hasErrors = true;
+                    checkResult.errors.push({
+                        field: fieldName,
+                        message: `値が一致しません`,
+                        expected: expectedStr,
+                        actual: currentStr,
+                        source: fieldData.source
+                    });
+                    sendLog(`❌ 不一致検出: ${fieldName} - 期待値: "${expectedStr}", 実際: "${currentStr}"`, 'error');
+                } else {
+                    sendLog(`✅ 一致確認: ${fieldName}`, 'info');
+                }
+
+            } catch (fieldError) {
+                console.error(`フィールド「${fieldName}」のチェックエラー:`, fieldError);
+                checkResult.errors.push({
+                    field: fieldName,
+                    message: `チェック中にエラーが発生しました: ${fieldError.message}`,
+                    expected: fieldData.value,
+                    actual: null
+                });
+            }
+        }
+
+        sendLog(`チェック完了: ${checkResult.checkedFields}個の項目を確認、${checkResult.errors.length}個のエラー`, 'info');
+
+    } catch (error) {
+        console.error('データ検証エラー:', error);
+        checkResult.errors.push({
+            field: '全般',
+            message: `検証中にエラーが発生しました: ${error.message}`,
+            expected: null,
+            actual: null
+        });
+    }
+
+    return checkResult;
 }
