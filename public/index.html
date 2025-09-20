@@ -422,6 +422,90 @@
         .form-summary-item.total {
             border-left-color: #28a745;
         }
+
+        /* エラーポップアップのスタイル */
+        .error-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: none;
+        }
+
+        .error-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
+        }
+
+        .error-popup-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            color: #dc3545;
+        }
+
+        .error-popup-icon {
+            font-size: 48px;
+            margin-right: 15px;
+        }
+
+        .error-popup-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .error-popup-message {
+            margin-bottom: 25px;
+            line-height: 1.6;
+            color: #333;
+            white-space: pre-wrap;
+        }
+
+        .error-popup-details {
+            background-color: #f8f9fa;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .error-popup-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        .error-popup-button:hover {
+            background-color: #c82333;
+        }
+
+        .processing-stopped {
+            background-color: #fff3cd !important;
+            border-color: #ffeaa7 !important;
+            color: #856404 !important;
+        }
     </style>
 </head>
 <body>
@@ -510,11 +594,31 @@
         <div class="log" id="log"></div>
     </div>
 
+    <!-- エラーポップアップ -->
+    <div class="error-popup-overlay" id="errorPopupOverlay">
+        <div class="error-popup">
+            <div class="error-popup-header">
+                <div class="error-popup-icon">🚨</div>
+                <h2 class="error-popup-title">処理エラーが発生しました</h2>
+            </div>
+            <div class="error-popup-message" id="errorPopupMessage">
+                エラーメッセージがここに表示されます
+            </div>
+            <div class="error-popup-details" id="errorPopupDetails" style="display: none;">
+                詳細情報
+            </div>
+            <button class="error-popup-button" onclick="closeErrorPopup()">
+                OK - 処理を停止します
+            </button>
+        </div>
+    </div>
+
     <script>
         let uploadedData = null;
         let uploadedPdf = null;
         let eventSource = null;
         let herpRegistrationCompleted = false;
+        let processingAborted = false;
 
         const fileInput = document.getElementById('fileInput');
         const pdfInput = document.getElementById('pdfInput');
@@ -1063,19 +1167,36 @@
                 const result = await response.json();
                 
                 if (!response.ok) {
-                    addLog(`実行エラー: ${result.error}`, 'error');
-                    if (result.details) {
-                        result.details.forEach(detail => {
-                            addLog(`詳細: ${detail}`, 'error');
-                        });
-                    }
-                    updateStatus('エラー', 'error');
+                    showErrorPopup(
+                        'サーバーエラー',
+                        'サーバー側でエラーが発生しました。',
+                        result.error || '不明なエラー'
+                    );
+                    return;
+                }
+
+                // 段階的なエラーチェック
+                if (!validateProcessingResult(result, '求人名抽出')) return;
+                if (!validateProcessingResult(result, '求人マッチング')) return;
+                if (!validateProcessingResult(result, 'PDF解析')) return;
+                if (!validateProcessingResult(result, 'フォーム解析')) return;
+                if (!validateProcessingResult(result, 'データマッピング')) return;
+                
+                // すべてのチェックをパスした場合のみ処理を継続
+                addLog('✅ 全ての検証をパスしました。処理を継続します。', 'success');
+                
+            } catch (error) {
+                if (!processingAborted) {
+                    showErrorPopup(
+                        'システムエラー',
+                        'システム内部でエラーが発生しました。',
+                        error.message
+                    );
+                }
+            } finally {
+                if (!processingAborted) {
                     executeBtn.disabled = false;
                 }
-            } catch (error) {
-                addLog(`通信エラー: ${error.message}`, 'error');
-                updateStatus('エラー', 'error');
-                executeBtn.disabled = false;
             }
         });
 
@@ -1332,8 +1453,17 @@
 
         // 自動HERP転記＋エラーチェック実行関数
         async function executeAutoHerpRegistration() {
+            if (processingAborted) {
+                addLog('処理が停止されているため、自動転記をスキップします', 'warning');
+                return;
+            }
+
             if (!latestEnhancedData || !latestPdfFile) {
-                addLog('自動転記に必要なデータが不足しています', 'error');
+                showErrorPopup(
+                    '自動転記データ不足',
+                    '自動転記に必要なデータが不足しています。',
+                    'Enhanced JSONデータまたはPDFファイルが見つかりません。'
+                );
                 return;
             }
 
@@ -1372,6 +1502,9 @@
                 }
 
                 if (response.ok) {
+                    // HERP転記結果の検証
+                    if (!validateProcessingResult(result, 'HERP転記')) return;
+                    
                     updateHerpRegistrationStatus(`✅ HERPへの転記が完了しました！ (${result.filledFields}個の項目を転記)`, 'success');
                     herpRegistrationCompleted = true;
                     document.getElementById('errorCheckBtn').style.display = 'inline-block';
@@ -1383,9 +1516,12 @@
                     await executeAutoErrorCheck();
                     
                 } else {
-                    const errorMsg = result.error || result.details || '不明なエラー';
-                    updateHerpRegistrationStatus(`❌ 転記エラー: ${errorMsg}`, 'error');
-                    herpRegistrationCompleted = false;
+                    showErrorPopup(
+                        'HERP転記失敗',
+                        'HERPフォームへの転記に失敗しました。',
+                        result.error || result.details || '不明なエラー'
+                    );
+                    return;
                 }
             } catch (error) {
                 updateHerpRegistrationStatus(`❌ 通信エラー: ${error.message}`, 'error');
@@ -1397,6 +1533,11 @@
 
         // 自動エラーチェック実行関数
         async function executeAutoErrorCheck() {
+            if (processingAborted) {
+                addLog('処理が停止されているため、エラーチェックをスキップします', 'warning');
+                return;
+            }
+
             const errorCheckBtn = document.getElementById('errorCheckBtn');
             errorCheckBtn.disabled = true;
             errorCheckBtn.textContent = '🔄 自動チェック中...';
@@ -1435,6 +1576,9 @@
                         });
                         updateErrorCheckStatus(errorMessage, 'error');
                         addLog(`エラーチェック完了: ${result.errors.length}件の不一致を検出`, 'warning');
+                        
+                        // エラーチェックで不整合が検出された場合は処理を停止
+                        if (!validateProcessingResult(result, 'エラーチェック')) return;
                     } else {
                         updateErrorCheckStatus(`✅ エラーチェック完了: 全ての項目が正しく転記されています！`, 'success');
                         addLog('エラーチェック完了: 全項目正常', 'success');
@@ -1442,13 +1586,236 @@
                 } else {
                     const errorMsg = result.error || result.details || '不明なエラー';
                     updateErrorCheckStatus(`❌ チェックエラー: ${errorMsg}`, 'error');
+                    
+                    // サーバーエラーの場合も処理を停止
+                    showErrorPopup(
+                        'エラーチェック失敗',
+                        'エラーチェック処理でサーバーエラーが発生しました。',
+                        errorMsg
+                    );
+                    return;
                 }
             } catch (error) {
                 updateErrorCheckStatus(`❌ 通信エラー: ${error.message}`, 'error');
+                
+                // 通信エラーの場合も処理を停止
+                if (!processingAborted) {
+                    showErrorPopup(
+                        'エラーチェック通信エラー',
+                        'エラーチェック処理中に通信エラーが発生しました。',
+                        error.message
+                    );
+                }
             } finally {
-                errorCheckBtn.disabled = false;
-                errorCheckBtn.textContent = '🔍 エラーチェックする';
+                if (!processingAborted) {
+                    errorCheckBtn.disabled = false;
+                    errorCheckBtn.textContent = '🔍 エラーチェックする';
+                }
             }
+        }
+
+        // エラーハンドリング関数
+        function showErrorPopup(title, message, details = null) {
+            processingAborted = true;
+            
+            // ポップアップの内容を設定
+            document.querySelector('.error-popup-title').textContent = title;
+            document.getElementById('errorPopupMessage').textContent = message;
+            
+            // 詳細情報があれば表示
+            const detailsDiv = document.getElementById('errorPopupDetails');
+            if (details) {
+                detailsDiv.textContent = details;
+                detailsDiv.style.display = 'block';
+            } else {
+                detailsDiv.style.display = 'none';
+            }
+            
+            // ポップアップを表示
+            document.getElementById('errorPopupOverlay').style.display = 'block';
+            
+            // ログにもエラーを記録
+            addLog(`❌ 処理停止: ${title} - ${message}`, 'error');
+            
+            // 処理停止の視覚的フィードバック
+            markProcessingStopped();
+        }
+
+        function closeErrorPopup() {
+            document.getElementById('errorPopupOverlay').style.display = 'none';
+        }
+
+        function markProcessingStopped() {
+            // 実行ボタンを無効化
+            const executeBtn = document.getElementById('executeBtn');
+            executeBtn.disabled = true;
+            executeBtn.textContent = '処理停止中 - ページを再読み込みしてください';
+            executeBtn.classList.add('processing-stopped');
+            
+            // 他のボタンも無効化
+            const registerBtn = document.getElementById('registerToHerpBtn');
+            const errorCheckBtn = document.getElementById('errorCheckBtn');
+            if (registerBtn) registerBtn.disabled = true;
+            if (errorCheckBtn) errorCheckBtn.disabled = true;
+        }
+
+        function validateProcessingResult(result, stepName) {
+            if (processingAborted) {
+                return false; // 既に処理が停止している場合は何もしない
+            }
+
+            // 基本的な結果チェック
+            if (!result) {
+                showErrorPopup(
+                    `${stepName}処理エラー`,
+                    `${stepName}の処理中に予期しないエラーが発生しました。`,
+                    'サーバーからの応答がありません。'
+                );
+                return false;
+            }
+
+            // 求人抽出エラーチェック
+            if (stepName === '求人名抽出' && result.extractionResult) {
+                if (!result.extractionResult.success) {
+                    showErrorPopup(
+                        '求人名抽出失敗',
+                        '求人名の抽出に失敗しました。\n処理を続行できません。',
+                        result.extractionResult.errors ? result.extractionResult.errors.join('\n') : '原因不明'
+                    );
+                    return false;
+                }
+                
+                if (result.extractionResult.confidence < 80) {
+                    showErrorPopup(
+                        '抽出信頼度不足',
+                        `求人名の抽出信頼度が不足しています。\n信頼度: ${result.extractionResult.confidence}% (最低80%必要)`,
+                        '曖昧な求人名のため、安全性を考慮して処理を停止します。'
+                    );
+                    return false;
+                }
+            }
+
+            // マッチングエラーチェック
+            if (stepName === '求人マッチング') {
+                // マッチング失敗の場合（matchedJob が null または matchType が 'none'）
+                if (!result.matchedJob || result.matchType === 'none') {
+                    showErrorPopup(
+                        '求人マッチング失敗',
+                        `求人「${result.inputJobName || '不明'}」に対応する職種が見つかりませんでした。\n処理を停止します。`,
+                        result.errors ? result.errors.join('\n') : 'HERPに該当する求人が存在しません。'
+                    );
+                    return false;
+                }
+
+                // 複数マッチングのチェック
+                if (result.alternatives && result.alternatives.length > 1) {
+                    showErrorPopup(
+                        '複数マッチング検出',
+                        '複数の求人がマッチしました。\n安全性のため処理を停止します。',
+                        `マッチした求人: ${result.alternatives.join(', ')}`
+                    );
+                    return false;
+                }
+
+                // 信頼度が低すぎる場合
+                if (result.confidence !== undefined && result.confidence < 85) {
+                    showErrorPopup(
+                        '信頼度不足',
+                        `マッチング信頼度が不十分です（${result.confidence}%）。\n安全性のため処理を停止します。`,
+                        `求人: ${result.inputJobName} → ${result.matchedJob}`
+                    );
+                    return false;
+                }
+            }
+
+            // PDF解析エラーチェック
+            if (stepName === 'PDF解析' && result.pdfResult) {
+                if (!result.pdfResult.success) {
+                    showErrorPopup(
+                        'PDF解析失敗',
+                        'PDFファイルの解析に失敗しました。',
+                        result.pdfResult.error || 'PDF形式が対応していない可能性があります。'
+                    );
+                    return false;
+                }
+
+                // 必須データの存在チェック
+                if (!result.pdfResult.extractedName) {
+                    showErrorPopup(
+                        'PDF必須データ不足',
+                        'PDFから氏名を抽出できませんでした。\n履歴書形式を確認してください。',
+                        'rirekisho形式のPDFファイルが必要です。'
+                    );
+                    return false;
+                }
+            }
+
+            // フォーム解析エラーチェック
+            if (stepName === 'フォーム解析' && result.formAnalysis) {
+                if (!result.formAnalysis.success) {
+                    showErrorPopup(
+                        'フォーム解析失敗',
+                        'HERPフォームの解析に失敗しました。',
+                        result.formAnalysis.error || 'フォーム構造が変更された可能性があります。'
+                    );
+                    return false;
+                }
+
+                if (!result.formAnalysis.fields || result.formAnalysis.fields.length === 0) {
+                    showErrorPopup(
+                        'フォーム項目不足',
+                        'HERPフォームから項目を取得できませんでした。',
+                        'ページが正しく読み込まれていない可能性があります。'
+                    );
+                    return false;
+                }
+            }
+
+            // マッピングエラーチェック
+            if (stepName === 'データマッピング' && result.mappingResult) {
+                if (!result.mappingResult.success) {
+                    showErrorPopup(
+                        'データマッピング失敗',
+                        '必須項目のデータマッピングに失敗しました。',
+                        result.mappingResult.error || '必要なデータが不足しています。'
+                    );
+                    return false;
+                }
+
+                // 信頼度チェック
+                if (result.mappingResult.lowConfidenceFields && result.mappingResult.lowConfidenceFields.length > 0) {
+                    showErrorPopup(
+                        'マッピング信頼度不足',
+                        '一部の必須項目で信頼度が不足しています。',
+                        `低信頼度項目: ${result.mappingResult.lowConfidenceFields.join(', ')}`
+                    );
+                    return false;
+                }
+            }
+
+            // HERP転記エラーチェック
+            if (stepName === 'HERP転記' && result.fillResult) {
+                if (!result.fillResult.success) {
+                    showErrorPopup(
+                        'HERP転記失敗',
+                        'HERPフォームへの転記に失敗しました。',
+                        result.fillResult.error || 'ネットワークエラーまたはページエラーが発生しました。'
+                    );
+                    return false;
+                }
+            }
+
+            // エラーチェック結果の検証
+            if (stepName === 'エラーチェック' && result.hasErrors) {
+                showErrorPopup(
+                    '転記内容不一致検出',
+                    `${result.errors.length}件の転記内容不一致が検出されました。\n手動確認が必要です。`,
+                    result.errors.map(err => `${err.field}: 期待値「${err.expected}」→ 実際「${err.actual}」`).join('\n')
+                );
+                return false;
+            }
+
+            return true; // エラーなし
         }
 
         // 初期化
@@ -1456,6 +1823,7 @@
         addLog('JSONファイルとrirekisho形式PDFファイルをアップロードしてください');
         addLog('実行ボタンを押すと、自動でHERP転記とエラーチェックまで実行されます', 'info');
         addLog('田中形式履歴書のみに特化した安定システムです');
+        addLog('⚠️ エラー時は自動で処理が停止し、ポップアップで詳細をお知らせします', 'warning');
     </script>
 </body>
 </html>
