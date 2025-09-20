@@ -1165,17 +1165,50 @@
                     body: formData
                 });
 
-                const result = await response.json();
+                const responseData = await response.json();
                 
                 if (!response.ok) {
                     showErrorPopup(
                         'サーバーエラー',
                         'サーバー側でエラーが発生しました。',
-                        result.error || '不明なエラー'
+                        responseData.error || '不明なエラー'
                     );
                     return;
                 }
 
+                // 🔍 レスポンス構造の詳細デバッグ
+                console.log(`🔍 生レスポンス:`, responseData);
+                console.log(`🔍 レスポンス構造:`, {
+                    hasMessage: 'message' in responseData,
+                    hasResult: 'result' in responseData,
+                    messageValue: responseData.message,
+                    resultKeys: responseData.result ? Object.keys(responseData.result) : 'undefined'
+                });
+
+                // レスポンス構造の正規化
+                const result = responseData.result || responseData;
+                console.log(`🔍 正規化後のresult:`, result);
+                
+                // 🚨 新しい自動停止機能：criticalErrorチェック（最優先）
+                if (result.criticalError) {
+                    showErrorPopup(
+                        result.stopReason || '処理停止',
+                        result.errorMessage || '重大なエラーが検出されました。',
+                        `エラータイプ: ${result.errorType || '不明'}`
+                    );
+                    return;
+                }
+
+                // 🔍 最終的なresult構造のデバッグ
+                console.log(`🔍 最終result構造:`, {
+                    inputJobName: result.inputJobName,
+                    matchedJob: result.matchedJob,
+                    matchType: result.matchType,
+                    confidence: result.confidence,
+                    extractionDetails: result.extractionDetails,
+                    formAnalysis: result.formAnalysis
+                });
+                
                 // 段階的なエラーチェック
                 if (!validateProcessingResult(result, '求人名抽出')) return;
                 if (!validateProcessingResult(result, '求人マッチング')) return;
@@ -1568,6 +1601,16 @@
 
                 if (response.ok) {
                     if (result.hasErrors) {
+                        // 🚨 エラーチェックで不一致検出時の自動停止
+                        if (result.criticalError) {
+                            showErrorPopup(
+                                result.stopReason || 'データ不一致検出',
+                                result.errorMessage || 'データの不一致が検出されました。',
+                                `不一致項目数: ${result.errors.length}件`
+                            );
+                            return;
+                        }
+
                         let errorMessage = `❌ ${result.errors.length}件の不一致が検出されました:`;
                         result.errors.forEach((error, index) => {
                             errorMessage += `\n\n${index + 1}. ${error.field}`;
@@ -1665,12 +1708,36 @@
                 return false; // 既に処理が停止している場合は何もしない
             }
 
-            // 基本的な結果チェック
+            // 🔍 デバッグ: 求人名の値を詳細ログ出力
+            console.log(`🔍 [${stepName}] 求人名デバッグ:`, {
+                inputJobName: result.inputJobName || 'undefined',
+                extractedName: result.extractionDetails?.extractedName || 'undefined',
+                matchedJob: result.matchedJob || 'undefined',
+                matchType: result.matchType || 'undefined',
+                confidence: result.confidence || 'undefined',
+                stepName: stepName,
+                timestamp: new Date().toISOString(),
+                resultKeys: Object.keys(result)
+            });
+            
+            // 🔍 結果オブジェクトの完全性チェック
             if (!result) {
+                console.error(`❌ [${stepName}] resultがnullまたはundefinedです`);
                 showErrorPopup(
                     `${stepName}処理エラー`,
-                    `${stepName}の処理中に予期しないエラーが発生しました。`,
-                    'サーバーからの応答がありません。'
+                    `${stepName}の処理結果が取得できませんでした。`,
+                    'サーバーからの応答が不正です。'
+                );
+                return false;
+            }
+
+
+            // 🚨 新しい自動停止機能：criticalErrorチェック
+            if (result.criticalError) {
+                showErrorPopup(
+                    result.stopReason || '処理停止',
+                    result.errorMessage || '重大なエラーが検出されました。',
+                    `エラータイプ: ${result.errorType || '不明'}`
                 );
                 return false;
             }
@@ -1698,8 +1765,24 @@
 
             // マッチングエラーチェック
             if (stepName === '求人マッチング') {
+                // 🔍 詳細デバッグログ
+                console.log(`🔍 求人マッチングチェック詳細:`, {
+                    matchedJob: result.matchedJob,
+                    matchType: result.matchType,
+                    inputJobName: result.inputJobName,
+                    confidence: result.confidence,
+                    alternatives: result.alternatives,
+                    errors: result.errors
+                });
+                
                 // マッチング失敗の場合（matchedJob が null または matchType が 'none'）
-                if (!result.matchedJob || result.matchType === 'none') {
+                if (!result.matchedJob || result.matchType === 'none' || result.matchedJob === null || result.matchedJob === undefined) {
+                    console.error(`❌ マッチング失敗検出:`, {
+                        matchedJob: result.matchedJob,
+                        matchType: result.matchType,
+                        inputJobName: result.inputJobName,
+                        confidence: result.confidence
+                    });
                     showErrorPopup(
                         '求人マッチング失敗',
                         `求人「${result.inputJobName || '不明'}」に対応する職種が見つかりませんでした。\n処理を停止します。`,
@@ -1707,6 +1790,14 @@
                     );
                     return false;
                 }
+                
+                // マッチング成功のログ
+                console.log(`✅ マッチング成功確認:`, {
+                    matchedJob: result.matchedJob,
+                    matchType: result.matchType,
+                    inputJobName: result.inputJobName,
+                    confidence: result.confidence
+                });
 
                 // 複数マッチングのチェック
                 if (result.alternatives && result.alternatives.length > 1) {
@@ -1837,6 +1928,10 @@
         addLog('JSONファイルとrirekisho形式PDFファイルをアップロードしてください');
         addLog('実行ボタンを押すと、自動でHERP転記とエラーチェックまで実行されます', 'info');
         addLog('田中形式履歴書のみに特化した安定システムです');
+        addLog('🚨 自動停止機能: 以下の場合に処理が自動停止します', 'warning');
+        addLog('  1. 求人マッチング失敗', 'warning');
+        addLog('  2. 必須項目マッピング失敗（1個以上）', 'warning');
+        addLog('  3. エラーチェックで不一致検出（1件以上）', 'warning');
         addLog('⚠️ エラー時は自動で処理が停止し、ポップアップで詳細をお知らせします', 'warning');
     </script>
 </body>

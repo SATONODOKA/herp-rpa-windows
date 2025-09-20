@@ -1828,6 +1828,9 @@ app.post('/execute', upload.fields([
         const inputJobName = extractionResult.extractedName;
         sendLog(`抽出された求人名: ${inputJobName} (信頼度: ${extractionResult.confidence}%, 方法: ${extractionResult.method})`);
         
+        // 🔍 求人名デバッグ: 詳細ログ出力
+        sendLog(`🔍 求人名デバッグ: "${inputJobName}" (型: ${typeof inputJobName}, 長さ: ${inputJobName?.length || 'N/A'})`, 'info');
+        
         // 信頼度チェック
         if (extractionResult.confidence < SAFETY_CONFIG.MINIMUM_CONFIDENCE_THRESHOLD) {
             sendLog(`信頼度が不足しています (${extractionResult.confidence}% < ${SAFETY_CONFIG.MINIMUM_CONFIDENCE_THRESHOLD}%)`, 'error');
@@ -1970,6 +1973,9 @@ app.post('/execute', upload.fields([
         if (!matchResult.success) {
             sendLog(`マッチングに失敗しました: ${matchResult.errors.join(', ')}`, 'error');
             
+            // 🚨 求人マッチング失敗時の自動停止
+            const errorMessage = `求人マッチングに失敗しました。\n\n原因: ${matchResult.errors.join(', ')}\n\n入力求人名: "${inputJobName}"\n利用可能な求人: ${jobListings.length}件`;
+            
             const result = {
                 inputJobName,
                 extractionDetails: extractionResult,
@@ -1978,21 +1984,30 @@ app.post('/execute', upload.fields([
                 confidence: 0,
                 availableJobs: jobListings,
                 errors: matchResult.errors,
-                alternatives: matchResult.alternatives
+                alternatives: matchResult.alternatives,
+                criticalError: true,
+                errorType: 'job_matching_failed',
+                errorMessage: errorMessage,
+                stopReason: '求人マッチング失敗'
             };
             
             sendEvent({ type: 'result', result });
-            sendLog('処理が完了しました（マッチング失敗）', 'warning');
+            sendLog('🚨 求人マッチング失敗により処理を停止します', 'error');
             sendEvent({ type: 'complete' });
             
             return res.json({ 
-                message: 'マッチングに失敗しました',
+                message: '求人マッチングに失敗しました',
                 result 
             });
         }
 
         // 成功した場合 - ボタンクリック処理を追加
         sendLog(`${matchResult.matchType === 'exact' ? '完全' : '部分'}一致: ${inputJobName} → ${matchResult.matchedJob} (信頼度: ${matchResult.confidence}%)`, 'success');
+        
+        // 🔍 求人名整合性チェック
+        if (inputJobName !== extractionResult.extractedName) {
+            sendLog(`⚠️ 求人名の不整合を検出: "${inputJobName}" ≠ "${extractionResult.extractedName}"`, 'warning');
+        }
         
         // マッチした求人に対応するボタンをクリック
         sendLog('対応する「この職種に推薦する」ボタンを検索しています...');
@@ -2039,10 +2054,55 @@ app.post('/execute', upload.fields([
                 if (mappingResult.success) {
                     sendLog(`データマッピング完了: ${mappingResult.mappedFields}個の項目をマッピング`, 'success');
                     
+                    // 🔍 自動停止チェック用デバッグ
+                    sendLog(`🔍 自動停止チェック: unmappedFields=${mappingResult.unmappedFields?.length || 0}個`, 'info');
+                    if (mappingResult.unmappedFields && mappingResult.unmappedFields.length > 0) {
+                        sendLog(`🔍 マッピング失敗項目: ${mappingResult.unmappedFields.map(f => f.fieldName).join(', ')}`, 'warning');
+                    }
+                    
+                    // 🚨 マッピング失敗項目がある場合は自動停止
+                    if (mappingResult.unmappedFields && mappingResult.unmappedFields.length > 0) {
+                        const unmappedFieldNames = mappingResult.unmappedFields.map(field => field.fieldName || field).join('\n- ');
+                        const errorMessage = `必須項目のマッピングに失敗しました。\n\nマッピング失敗項目: ${mappingResult.unmappedFields.length}件\n- ${unmappedFieldNames}\n\n全ての必須項目が正しくマッピングされるまで処理を停止します。`;
+                        
+                        sendLog('🚨 必須項目のマッピング失敗により処理を停止します', 'error');
+                        formAnalysisResult.criticalError = true;
+                        formAnalysisResult.errorMessage = errorMessage;
+                        formAnalysisResult.dataMapping = mappingResult;
+                        
+                        const result = {
+                            inputJobName,
+                            extractionDetails: extractionResult,
+                            jobMatching: matchResult,
+                            matchedJob: matchResult.matchedJob,
+                            matchType: matchResult.matchType,
+                            formAnalysis: formAnalysisResult,
+                            mappingResult: mappingResult,
+                            success: false,
+                            error: '必須項目マッピング失敗',
+                            criticalError: true,
+                            errorType: 'required_field_mapping_failed',
+                            errorMessage: errorMessage,
+                            stopReason: '必須項目マッピング失敗',
+                            unmappedFields: unmappedFieldNames
+                        };
+                        
+                        sendEvent({ type: 'result', result });
+                        sendLog('🚨 必須項目マッピング失敗により処理を停止します', 'error');
+                        sendEvent({ type: 'complete' });
+                        
+                        res.json(result);
+                        await browser.close();
+                        return;
+                    }
+                    
                     // フォーム自動入力はHERPに対して実行しないため削除
                     sendLog('データマッピングが完了しました。フォーム自動入力は実行しません（HERPサイトへの直接入力は行いません）', 'info');
                     
                     // 拡張JSONを生成
+                    // 🔍 拡張JSON生成前の求人名デバッグ
+                    sendLog(`🔍 拡張JSON生成前デバッグ: inputJobName="${inputJobName}", matchedJob="${matchResult.matchedJob}"`, 'info');
+                    
                     const enhancedJson = await generateEnhancedJson(
                         jsonData, 
                         pdfResult, 
@@ -2068,13 +2128,21 @@ app.post('/execute', upload.fields([
                     sendLog(`データマッピングに失敗: ${mappingResult.error}`, 'error');
                     
                     // 必須項目のマッピング失敗の場合は処理を停止
-                    if (mappingResult.criticalError) {
+                    if (mappingResult.criticalError || (mappingResult.unmappedFields && mappingResult.unmappedFields.length > 0)) {
+                        // 🚨 必須項目マッピング失敗時の自動停止
+                        const unmappedFields = mappingResult.unmappedFields || [];
+                        const unmappedFieldNames = unmappedFields.map(field => field.fieldName || field).join('\n- ');
+                        const errorMessage = `必須項目のマッピングに失敗しました。\n\nマッピング失敗項目: ${unmappedFields.length}件\n- ${unmappedFieldNames}\n\nエラー詳細: ${mappingResult.error}`;
+                        
                         sendLog('🚨 必須項目のマッピング失敗により処理を停止します', 'error');
                         formAnalysisResult.criticalError = true;
-                        formAnalysisResult.errorMessage = mappingResult.error;
+                        formAnalysisResult.errorMessage = errorMessage;
                         formAnalysisResult.dataMapping = mappingResult;
                         
                         // ここで処理を停止（拡張JSON生成などは実行しない）
+                        // 🔍 最終的な求人名デバッグ
+                        sendLog(`🔍 最終求人名デバッグ: "${inputJobName}" (型: ${typeof inputJobName})`, 'info');
+                        
                         const result = {
                             inputJobName,
                             extractionDetails: extractionResult,
@@ -2082,11 +2150,19 @@ app.post('/execute', upload.fields([
                             matchedJob: matchResult.matchedJob,
                             matchType: matchResult.matchType,
                             formAnalysis: formAnalysisResult,
-                            mappingResult: mappingResult,  // 追加: マッピング結果を含める
+                            mappingResult: mappingResult,
                             success: false,
                             error: mappingResult.error,
-                            criticalError: true
+                            criticalError: true,
+                            errorType: 'required_field_mapping_failed',
+                            errorMessage: errorMessage,
+                            stopReason: '必須項目マッピング失敗',
+                            unmappedFields: unmappedFieldNames
                         };
+                        
+                        sendEvent({ type: 'result', result });
+                        sendLog('🚨 必須項目マッピング失敗により処理を停止します', 'error');
+                        sendEvent({ type: 'complete' });
                         
                         res.json(result);
                         await browser.close();
@@ -2097,6 +2173,9 @@ app.post('/execute', upload.fields([
                 sendLog(`フォーム解析に失敗: ${formAnalysisResult.error}`, 'error');
             }
         }
+        
+        // 🔍 最終結果生成前の求人名デバッグ
+        sendLog(`🔍 最終結果生成前デバッグ: inputJobName="${inputJobName}" (型: ${typeof inputJobName})`, 'info');
         
         const result = {
             inputJobName,
@@ -2255,17 +2334,30 @@ app.post('/error-check', upload.none(), async (req, res) => {
         }
 
         sendLog('転記データのチェックを開始しています...', 'info');
+        
+        // 🔍 エラーチェック時の求人名デバッグ
+        const checkJobName = enhancedData?.inputJobName || 'undefined';
+        sendLog(`🔍 エラーチェック時デバッグ: checkJobName="${checkJobName}" (型: ${typeof checkJobName})`, 'info');
 
         // データ検証の実行
         const checkResult = await verifyHerpFormData(page, enhancedData);
 
         if (checkResult.hasErrors) {
+            // 🚨 エラーチェックで不一致検出時の自動停止
+            const errorMessage = `データの不一致が検出されました。\n\n不一致項目: ${checkResult.errors.length}件\n${checkResult.errors.map(error => `- ${error.field}: ${error.message}`).join('\n')}\n\n全ての項目が正しく転記されるまで処理を停止します。`;
+            
             sendLog(`❌ エラーが検出されました: ${checkResult.errors.length}件の不一致`, 'error');
+            sendLog('🚨 データ不一致により処理を停止します', 'error');
+            
             res.json({
                 hasErrors: true,
                 errors: checkResult.errors,
                 checkedFields: checkResult.checkedFields,
-                message: 'データの不一致が検出されました'
+                message: 'データの不一致が検出されました',
+                criticalError: true,
+                errorType: 'data_validation_failed',
+                errorMessage: errorMessage,
+                stopReason: 'データ不一致検出'
             });
         } else {
             sendLog('✅ エラーチェック完了: 全ての項目が正しく転記されています', 'success');
