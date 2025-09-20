@@ -821,6 +821,11 @@
                     </div>
                 `;
                 herpStatusDiv.style.display = 'block';
+                
+                // 自動でHERP転記とエラーチェックを実行
+                setTimeout(async () => {
+                    await executeAutoHerpRegistration();
+                }, 1500); // 1.5秒待ってから自動実行
             }
         }
         
@@ -1325,9 +1330,131 @@
             statusDiv.style.whiteSpace = 'pre-wrap'; // 改行を表示
         }
 
+        // 自動HERP転記＋エラーチェック実行関数
+        async function executeAutoHerpRegistration() {
+            if (!latestEnhancedData || !latestPdfFile) {
+                addLog('自動転記に必要なデータが不足しています', 'error');
+                return;
+            }
+
+            addLog('自動HERP転記処理を開始します...', 'info');
+            
+            // 1. HERP転記を実行
+            const registerBtn = document.getElementById('registerToHerpBtn');
+            registerBtn.disabled = true;
+            registerBtn.textContent = '🔄 自動転記中...';
+            
+            try {
+                updateHerpRegistrationStatus('HERPフォームへの自動転記を実行中...', 'info');
+
+                // FormDataを作成
+                const formData = new FormData();
+                formData.append('enhancedData', JSON.stringify(latestEnhancedData));
+                formData.append('pdfFile', latestPdfFile);
+
+                const response = await fetch('/herp-register', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const contentType = response.headers.get('content-type');
+                let result;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    const textResponse = await response.text();
+                    updateHerpRegistrationStatus(`❌ サーバーエラー: 不正なレスポンス形式`, 'error');
+                    console.error('非JSONレスポンス:', textResponse);
+                    registerBtn.disabled = false;
+                    registerBtn.textContent = '📝 HERPに登録する';
+                    return;
+                }
+
+                if (response.ok) {
+                    updateHerpRegistrationStatus(`✅ HERPへの転記が完了しました！ (${result.filledFields}個の項目を転記)`, 'success');
+                    herpRegistrationCompleted = true;
+                    document.getElementById('errorCheckBtn').style.display = 'inline-block';
+                    
+                    // 2. 自動でエラーチェックを実行
+                    addLog('自動エラーチェックを開始します...', 'info');
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒待機
+                    
+                    await executeAutoErrorCheck();
+                    
+                } else {
+                    const errorMsg = result.error || result.details || '不明なエラー';
+                    updateHerpRegistrationStatus(`❌ 転記エラー: ${errorMsg}`, 'error');
+                    herpRegistrationCompleted = false;
+                }
+            } catch (error) {
+                updateHerpRegistrationStatus(`❌ 通信エラー: ${error.message}`, 'error');
+            } finally {
+                registerBtn.disabled = false;
+                registerBtn.textContent = '📝 HERPに登録する';
+            }
+        }
+
+        // 自動エラーチェック実行関数
+        async function executeAutoErrorCheck() {
+            const errorCheckBtn = document.getElementById('errorCheckBtn');
+            errorCheckBtn.disabled = true;
+            errorCheckBtn.textContent = '🔄 自動チェック中...';
+
+            try {
+                updateErrorCheckStatus('転記データの自動チェックを実行中...', 'info');
+
+                const formData = new FormData();
+                formData.append('enhancedData', JSON.stringify(latestEnhancedData));
+
+                const response = await fetch('/error-check', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const contentType = response.headers.get('content-type');
+                let result;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    const textResponse = await response.text();
+                    updateErrorCheckStatus(`❌ サーバーエラー: 不正なレスポンス形式`, 'error');
+                    console.error('非JSONレスポンス:', textResponse);
+                    return;
+                }
+
+                if (response.ok) {
+                    if (result.hasErrors) {
+                        let errorMessage = `❌ ${result.errors.length}件の不一致が検出されました:`;
+                        result.errors.forEach((error, index) => {
+                            errorMessage += `\n\n${index + 1}. ${error.field}`;
+                            if (error.expected && error.actual) {
+                                errorMessage += `\n  期待値: "${error.expected}"\n  実際: "${error.actual}"`;
+                            }
+                        });
+                        updateErrorCheckStatus(errorMessage, 'error');
+                        addLog(`エラーチェック完了: ${result.errors.length}件の不一致を検出`, 'warning');
+                    } else {
+                        updateErrorCheckStatus(`✅ エラーチェック完了: 全ての項目が正しく転記されています！`, 'success');
+                        addLog('エラーチェック完了: 全項目正常', 'success');
+                    }
+                } else {
+                    const errorMsg = result.error || result.details || '不明なエラー';
+                    updateErrorCheckStatus(`❌ チェックエラー: ${errorMsg}`, 'error');
+                }
+            } catch (error) {
+                updateErrorCheckStatus(`❌ 通信エラー: ${error.message}`, 'error');
+            } finally {
+                errorCheckBtn.disabled = false;
+                errorCheckBtn.textContent = '🔍 エラーチェックする';
+            }
+        }
+
         // 初期化
         addLog('求人照合RPAツール (rirekisho特化版) が起動しました');
         addLog('JSONファイルとrirekisho形式PDFファイルをアップロードしてください');
+        addLog('実行ボタンを押すと、自動でHERP転記とエラーチェックまで実行されます', 'info');
         addLog('田中形式履歴書のみに特化した安定システムです');
     </script>
 </body>

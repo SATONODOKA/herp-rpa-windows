@@ -1,0 +1,149 @@
+{
+  "metadata": {
+    "originalJsonFile": {
+      "recommendation_no_raw": "20250914-TEST-プロジェクトマネージャー-全項目必須",
+      "kintone": {
+        "source": "kintone",
+        "fetched_at": "2025-09-14T15:00:00+09:00",
+        "record": {
+          "ats_type_1_raw": "HERP",
+          "browser_name_1_raw": "Chrome",
+          "company_name_raw": "株式会社テストカンパニー",
+          "ats_url_1_raw": "https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw",
+          "ats_id_1_raw": "agent@example.com",
+          "ats_pw_1_raw": "password123",
+          "notes_1_raw": "全項目必須テスト",
+          "ats_input_type_1_raw": "追加指定項目あり＋PDF",
+          "ats_input_language_1_raw": "すべて日本語",
+          "pdf_processing_required_raw": null,
+          "additional_required_fields_raw": [
+            "応募者氏名",
+            "現所属",
+            "年齢",
+            "最終学歴",
+            "電話番号",
+            "メールアドレス",
+            "推薦時コメント",
+            "履歴書",
+            "経歴",
+            "現年収",
+            "希望年収",
+            "希望年収（最低）",
+            "その他希望条件"
+          ],
+          "auto_consent_fields_raw": {
+            "登録内容に誤りはありません": "はい",
+            "エージェント様の個人情報の取り扱いについて": "同意します",
+            "履歴書": "ー"
+          }
+        }
+      },
+      "calib": {
+        "source": "calib",
+        "fetched_at": "2025-09-14T15:00:00+09:00",
+        "record": {
+          "ra_memo_raw": "W送付プロジェクトマネージャー※現職はソニー株式会社、現年収:750万円、希望年収:850万円【希望年収は仮のため面談で確認】、最低希望年収:800万円",
+          "pdf_export": {
+            "performed_raw": true,
+            "file_path": "/downloads/calib/20250914-TEST-全項目必須.pdf"
+          }
+        }
+      }
+    },
+    "pdfAnalysisResult": {
+      "extractionMethod": "pdf-parse-simple",
+      "extractedName": "田中 健太",
+      "furigana": "たなか けんた",
+      "age": 25,
+      "phone": "080-1234-5678",
+      "email": "k.tanaka.sales@outlook.jp",
+      "recommendationComment": "・面談時に伺ったお話や印象から以下の様な場面で力を発揮されると感じられます。\n・豊富なIT業界での法人営業経験と実績をお持ちで、金融業界でも即戦力として活躍が期待できます。\n・論理的思考力と高いコミュニケーション能力を備え、チームをリードする力をお持ちです。\n・新しい業界への挑戦意欲が高く、積極的に学習し成⻑される向上心の強い方です。\n・顧客視点での課題発見・解決提案力に優れ、信頼関係構築が得意な方です。\nお人柄も良く、今後のご活躍が期待される方ですので、ぜひ一度面接の機会頂きたくよろしくお願いい\nたします。",
+      "careerSummary": "新卒で入社したIT企業にて、SaaS製品の法人営業として6年間従事し、新規開拓から既存顧客のアップ\nセルまで幅広い営業業務を経験してまいりました。チームリーダーとして営業戦略の立案やメンバー育\n成にも携わり、チーム売上前年比120%を達成いたしました。営業プロセスの効率化や顧客データ分析\nを通じて、持続的な成果創出に貢献してきました。これまでの経験で培った「顧客視点での課題発見・\n解決提案力」を活かし、金融業界において新たな価値創造に挑戦したいと考えています。",
+      "confidence": 100
+    },
+    "mappingResult": {
+      "mappedFields": 15,
+      "totalRequiredFields": 15
+    },
+    "generatedAt": "2025-09-20T12:04:28.612Z",
+    "targetJob": "プロジェクトマネージャー"
+  },
+  "formData": {
+    "応募者氏名": {
+      "value": "田中 健太",
+      "source": "PDF-simple-extractor",
+      "confidence": 100
+    },
+    "現所属": {
+      "value": "株式会社フィンテックソリューションズ",
+      "source": "現所属自動抽出",
+      "confidence": 90
+    },
+    "年齢": {
+      "value": "25歳",
+      "source": "PDF-simple-extractor",
+      "confidence": 100
+    },
+    "最終学歴": {
+      "value": "早稲田大学 商学部 経営学科",
+      "source": "最終学歴自動抽出",
+      "confidence": 90
+    },
+    "電話番号": {
+      "value": "080-1234-5678",
+      "source": "PDF-simple-extractor",
+      "confidence": 100
+    },
+    "メールアドレス": {
+      "value": "k.tanaka.sales@outlook.jp",
+      "source": "PDF-simple-extractor",
+      "confidence": 100
+    },
+    "推薦時コメント": {
+      "value": "・面談時に伺ったお話や印象から以下の様な場面で力を発揮されると感じられます。\n・豊富なIT業界での法人営業経験と実績をお持ちで、金融業界でも即戦力として活躍が期待できます。\n・論理的思考力と高いコミュニケーション能力を備え、チームをリードする力をお持ちです。\n・新しい業界への挑戦意欲が高く、積極的に学習し成⻑される向上心の強い方です。\n・顧客視点での課題発見・解決提案力に優れ、信頼関係構築が得意な方です。\nお人柄も良く、今後のご活躍が期待される方ですので、ぜひ一度面接の機会頂きたくよろしくお願いい\nたします。",
+      "source": "PDF-simple-extractor",
+      "confidence": 100
+    },
+    "履歴書": {
+      "value": "ー",
+      "source": "自動ファイル設定（直接マッチ）",
+      "confidence": 100
+    },
+    "経歴": {
+      "value": "新卒で入社したIT企業にて、SaaS製品の法人営業として6年間従事し、新規開拓から既存顧客のアップ\nセルまで幅広い営業業務を経験してまいりました。チームリーダーとして営業戦略の立案やメンバー育\n成にも携わり、チーム売上前年比120%を達成いたしました。営業プロセスの効率化や顧客データ分析\nを通じて、持続的な成果創出に貢献してきました。これまでの経験で培った「顧客視点での課題発見・\n解決提案力」を活かし、金融業界において新たな価値創造に挑戦したいと考えています。",
+      "source": "PDF-simple-extractor",
+      "confidence": 100
+    },
+    "現年収": {
+      "value": "750万円",
+      "source": "RAコメント",
+      "confidence": 95
+    },
+    "希望年収": {
+      "value": "850万円",
+      "source": "RAコメント",
+      "confidence": 95
+    },
+    "希望年収（最低）": {
+      "value": "800万円",
+      "source": "RAコメント",
+      "confidence": 95
+    },
+    "その他希望条件": {
+      "value": "希望年収は仮のため面談で確認",
+      "source": "RAコメント",
+      "confidence": 90
+    },
+    "登録内容に誤りはありません": {
+      "value": "はい",
+      "source": "自動同意設定（直接マッチ）",
+      "confidence": 100
+    },
+    "エージェント様の個人情報の取り扱いについて": {
+      "value": "同意します",
+      "source": "自動同意設定（直接マッチ）",
+      "confidence": 100
+    }
+  },
+  "unmappedRequiredFields": []
+}
