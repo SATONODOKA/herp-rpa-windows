@@ -1,0 +1,142 @@
+{
+  "metadata": {
+    "originalJsonFile": {
+      "recommendation_no_raw": "20250914-TEST-プロジェクトマネージャー-全項目必須",
+      "kintone": {
+        "source": "kintone",
+        "fetched_at": "2025-09-14T15:00:00+09:00",
+        "record": {
+          "ats_type_1_raw": "HERP",
+          "browser_name_1_raw": "Chrome",
+          "company_name_raw": "株式会社テストカンパニー",
+          "ats_url_1_raw": "https://agent.herp.cloud/p/HO3nC9noAkwOgXlKbC-hDeewP8nK4yQlrT2OnkN2XTw",
+          "ats_id_1_raw": "agent@example.com",
+          "ats_pw_1_raw": "password123",
+          "notes_1_raw": "全項目必須テスト",
+          "ats_input_type_1_raw": "追加指定項目あり＋PDF",
+          "ats_input_language_1_raw": "すべて日本語",
+          "pdf_processing_required_raw": null,
+          "additional_required_fields_raw": [
+            "応募者氏名",
+            "現所属",
+            "年齢",
+            "最終学歴",
+            "電話番号",
+            "メールアドレス",
+            "推薦時コメント",
+            "履歴書",
+            "経歴",
+            "現年収",
+            "希望年収",
+            "希望年収（最低）",
+            "その他希望条件"
+          ],
+          "auto_consent_fields_raw": {
+            "登録内容に誤りはありません": "はい",
+            "エージェント様の個人情報の取り扱いについて": "同意します",
+            "履歴書": "ー"
+          }
+        }
+      },
+      "calib": {
+        "source": "calib",
+        "fetched_at": "2025-09-14T15:00:00+09:00",
+        "record": {
+          "ra_memo_raw": "W送付プロジェクトマネージャー※現職はソニー株式会社、現年収:750万円、希望年収:850万円【希望年収は仮のため面談で確認】、最低希望年収:800万円",
+          "pdf_export": {
+            "performed_raw": true,
+            "file_path": "/downloads/calib/20250914-TEST-全項目必須.pdf"
+          }
+        }
+      }
+    },
+    "pdfAnalysisResult": {
+      "extractionMethod": "pdf-parse-simple"
+    },
+    "mappingResult": {
+      "mappedFields": 7,
+      "totalRequiredFields": 15
+    },
+    "generatedAt": "2025-09-19T14:13:37.411Z",
+    "targetJob": "プロジェクトマネージャー"
+  },
+  "formData": {
+    "履歴書": {
+      "value": "ー",
+      "source": "自動ファイル設定（直接マッチ）",
+      "confidence": 100
+    },
+    "現年収": {
+      "value": "750万円",
+      "source": "RAコメント",
+      "confidence": 95
+    },
+    "希望年収": {
+      "value": "850万円",
+      "source": "RAコメント",
+      "confidence": 95
+    },
+    "希望年収（最低）": {
+      "value": "800万円",
+      "source": "RAコメント",
+      "confidence": 95
+    },
+    "その他希望条件": {
+      "value": "希望年収は仮のため面談で確認",
+      "source": "RAコメント",
+      "confidence": 90
+    },
+    "登録内容に誤りはありません": {
+      "value": "はい",
+      "source": "自動同意設定（直接マッチ）",
+      "confidence": 100
+    },
+    "エージェント様の個人情報の取り扱いについて": {
+      "value": "同意します",
+      "source": "自動同意設定（直接マッチ）",
+      "confidence": 100
+    }
+  },
+  "unmappedRequiredFields": [
+    {
+      "fieldName": "応募者氏名",
+      "fieldType": "text",
+      "reason": "PDFまたはRAコメントに対応するデータが見つかりません"
+    },
+    {
+      "fieldName": "現所属",
+      "fieldType": "text",
+      "reason": "PDFまたはRAコメントに対応するデータが見つかりません"
+    },
+    {
+      "fieldName": "年齢",
+      "fieldType": "text",
+      "reason": "PDFまたはRAコメントに対応するデータが見つかりません"
+    },
+    {
+      "fieldName": "最終学歴",
+      "fieldType": "text",
+      "reason": "PDFまたはRAコメントに対応するデータが見つかりません"
+    },
+    {
+      "fieldName": "電話番号",
+      "fieldType": "text",
+      "reason": "PDFまたはRAコメントに対応するデータが見つかりません"
+    },
+    {
+      "fieldName": "メールアドレス",
+      "fieldType": "email",
+      "reason": "PDFまたはRAコメントに対応するデータが見つかりません"
+    },
+    {
+      "fieldName": "推薦時コメント",
+      "fieldType": "textarea",
+      "reason": "PDFまたはRAコメントに対応するデータが見つかりません"
+    },
+    {
+      "fieldName": "経歴",
+      "fieldType": "textarea",
+      "reason": "PDFまたはRAコメントに対応するデータが見つかりません"
+    }
+  ]
+}
