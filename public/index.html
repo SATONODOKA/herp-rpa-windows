@@ -1388,15 +1388,24 @@
                     return;
                 }
 
-                if (response.ok) {
+                if (response.ok && result.success !== false && !result.criticalError) {
                     updateHerpRegistrationStatus(`✅ HERPへの転記が完了しました！ (${result.filledFields}個の項目を転記)`, 'success');
                     herpRegistrationCompleted = true;
                     // エラーチェックボタンを表示
                     document.getElementById('errorCheckBtn').style.display = 'inline-block';
                 } else {
-                    const errorMsg = result.error || result.details || '不明なエラー';
+                    // サーバー側で処理が失敗している場合
+                    const errorMsg = result.errorMessage || result.error || result.details || '不明なエラー';
                     updateHerpRegistrationStatus(`❌ 転記エラー: ${errorMsg}`, 'error');
                     herpRegistrationCompleted = false;
+                    
+                    // クリティカルエラーの場合はログに詳細を表示
+                    if (result.criticalError) {
+                        addLog(`🚨 クリティカルエラー: ${result.errorMessage || result.error}`, 'error');
+                        if (result.stopReason) {
+                            addLog(`🛑 停止理由: ${result.stopReason}`, 'error');
+                        }
+                    }
                 }
             } catch (error) {
                 updateHerpRegistrationStatus(`❌ 通信エラー: ${error.message}`, 'error');
@@ -1453,7 +1462,7 @@
                 }
 
                 if (response.ok) {
-                    if (result.hasErrors) {
+                    if (result.hasErrors || result.criticalError) {
                         let errorMessage = `❌ ${result.errors.length}件の不一致が検出されました:`;
                         result.errors.forEach((error, index) => {
                             errorMessage += `\n\n${index + 1}. ${error.field}`;
@@ -1461,7 +1470,21 @@
                                 errorMessage += `\n  期待値: "${error.expected}"\n  実際: "${error.actual}"`;
                             }
                         });
+                        
+                        // クリティカルエラーの場合は追加情報を表示
+                        if (result.criticalError) {
+                            errorMessage += `\n\n🚨 クリティカルエラー: ${result.errorMessage || result.error}`;
+                            if (result.stopReason) {
+                                errorMessage += `\n🛑 停止理由: ${result.stopReason}`;
+                            }
+                        }
+                        
                         updateErrorCheckStatus(errorMessage, 'error');
+                        
+                        // クリティカルエラーの場合はログにも記録
+                        if (result.criticalError) {
+                            addLog(`🚨 エラーチェックでクリティカルエラー検出: ${result.errorMessage || result.error}`, 'error');
+                        }
                     } else {
                         updateErrorCheckStatus(`✅ エラーチェック完了: 問題ありません！全ての項目が正しく転記されています。`, 'success');
                     }
@@ -1535,7 +1558,7 @@
                     return;
                 }
 
-                if (response.ok) {
+                if (response.ok && result.success !== false && !result.criticalError) {
                     // HERP転記結果の検証
                     if (!validateProcessingResult(result, 'HERP転記')) return;
                     
@@ -1550,11 +1573,21 @@
                     await executeAutoErrorCheck();
                     
                 } else {
+                    // サーバー側で処理が失敗している場合
+                    const errorMsg = result.errorMessage || result.error || result.details || '不明なエラー';
+                    const stopReason = result.stopReason || '処理失敗';
+                    
                     showErrorPopup(
                         'HERP転記失敗',
                         'HERPフォームへの転記に失敗しました。',
-                        result.error || result.details || '不明なエラー'
+                        `${errorMsg}\n\n停止理由: ${stopReason}`
                     );
+                    
+                    // クリティカルエラーの場合はログに詳細を表示
+                    if (result.criticalError) {
+                        addLog(`🚨 HERP転記でクリティカルエラー: ${errorMsg}`, 'error');
+                        addLog(`🛑 停止理由: ${stopReason}`, 'error');
+                    }
                     return;
                 }
             } catch (error) {
@@ -1600,7 +1633,7 @@
                 }
 
                 if (response.ok) {
-                    if (result.hasErrors) {
+                    if (result.hasErrors || result.criticalError) {
                         // 🚨 エラーチェックで不一致検出時の自動停止
                         if (result.criticalError) {
                             showErrorPopup(
@@ -1608,6 +1641,7 @@
                                 result.errorMessage || 'データの不一致が検出されました。',
                                 `不一致項目数: ${result.errors.length}件`
                             );
+                            addLog(`🚨 エラーチェックでクリティカルエラー検出: ${result.errorMessage || result.error}`, 'error');
                             return;
                         }
 
@@ -1618,6 +1652,15 @@
                                 errorMessage += `\n  期待値: "${error.expected}"\n  実際: "${error.actual}"`;
                             }
                         });
+                        
+                        // クリティカルエラーの場合は追加情報を表示
+                        if (result.criticalError) {
+                            errorMessage += `\n\n🚨 クリティカルエラー: ${result.errorMessage || result.error}`;
+                            if (result.stopReason) {
+                                errorMessage += `\n🛑 停止理由: ${result.stopReason}`;
+                            }
+                        }
+                        
                         updateErrorCheckStatus(errorMessage, 'error');
                         addLog(`エラーチェック完了: ${result.errors.length}件の不一致を検出`, 'warning');
                         
