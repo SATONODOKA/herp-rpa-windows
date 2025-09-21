@@ -4,7 +4,7 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { SimplePDFExtractor } = require('./pdf_processing/simple-pdf-extractor');
+const { SimplePDFExtractor } = require('./src/extractors/simple-pdf-extractor');
 
 const app = express();
 const port = 3001;
@@ -17,11 +17,11 @@ app.use(express.static('public'));
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         if (file.fieldname === 'jsonFile') {
-            cb(null, 'uploads/');
+            cb(null, 'input/ready/');
         } else if (file.fieldname === 'pdfFile') {
-            cb(null, 'uploads/pdfs/');
+            cb(null, 'input/ready/');
         } else {
-            cb(null, 'uploads/');
+            cb(null, 'input/ready/');
         }
     },
     filename: function (req, file, cb) {
@@ -1223,7 +1223,7 @@ async function saveFormAnalysisToFile(analysisResult, jobName) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const sanitizedJobName = jobName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
         const fileName = `form_analysis_${sanitizedJobName}_${timestamp}.json`;
-        const filePath = path.join(__dirname, 'form_analysis', fileName);
+        const filePath = path.join(__dirname, 'logs/process', fileName);
 
         // ディレクトリが存在しない場合は作成
         const dir = path.dirname(filePath);
@@ -1656,7 +1656,7 @@ async function generateEnhancedJson(originalJson, pdfResult, mappingResult, jobN
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const sanitizedJobName = jobName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
         const fileName = `enhanced_${sanitizedJobName}_${timestamp}.json`;
-        const filePath = path.join(__dirname, 'results/enhanced_jsons', fileName);
+        const filePath = path.join(__dirname, 'output/success', fileName);
 
         // ディレクトリが存在しない場合は作成
         const dir = path.dirname(filePath);

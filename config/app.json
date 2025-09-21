@@ -1,0 +1,96 @@
+{
+  "app": {
+    "name": "HERP求人照合RPAツール",
+    "version": "1.0.0",
+    "port": 3001,
+    "environment": "production"
+  },
+  "folders": {
+    "input": {
+      "ready": "input/ready/",
+      "samples": "input/samples/"
+    },
+    "output": {
+      "success": "output/success/",
+      "failed": "output/failed/",
+      "temp": "output/temp/"
+    },
+    "logs": {
+      "process": "logs/process/",
+      "error": "logs/error/",
+      "audit": "logs/audit/"
+    },
+    "archive": "archive/"
+  },
+  "retention": {
+    "input": {
+      "ready": {
+        "action": "delete_after_processing",
+        "description": "処理後即削除"
+      },
+      "samples": {
+        "action": "permanent",
+        "description": "永続保存"
+      }
+    },
+    "output": {
+      "success": {
+        "days": 30,
+        "action": "archive",
+        "description": "30日間保存後、アーカイブへ移動"
+      },
+      "failed": {
+        "days": 7,
+        "action": "delete",
+        "description": "7日間保存後、削除"
+      },
+      "temp": {
+        "hours": 24,
+        "action": "delete",
+        "description": "24時間後に自動削除"
+      }
+    },
+    "logs": {
+      "process": {
+        "days": 90,
+        "action": "archive",
+        "description": "90日間保存"
+      },
+      "error": {
+        "days": 180,
+        "action": "archive",
+        "description": "180日間保存"
+      },
+      "audit": {
+        "days": 365,
+        "action": "archive",
+        "description": "1年間保存"
+      }
+    },
+    "archive": {
+      "compress_after_days": 365,
+      "delete_after_days": 730,
+      "description": "1年後に圧縮、2年後に削除"
+    }
+  },
+  "naming": {
+    "output": {
+      "pattern": "{timestamp}_{jobName}_{status}.json",
+      "example": "2025-09-21T10-30-00_営業職_success.json"
+    },
+    "logs": {
+      "pattern": "{date}_{type}.log",
+      "example": "2025-09-21_process.log"
+    },
+    "archive": {
+      "pattern": "{year-month}_{type}.tar.gz",
+      "example": "2025-09_output.tar.gz"
+    }
+  },
+  "features": {
+    "auto_cleanup": true,
+    "auto_archive": true,
+    "audit_logging": true,
+    "error_notification": false
+  }
+}
