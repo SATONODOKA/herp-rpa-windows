@@ -16,12 +16,19 @@ app.use(express.static('public'));
 // multer設定（JSONとPDFファイル用）
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
+        const inputReadyPath = path.join(__dirname, 'input', 'ready');
+        
+        // ディレクトリが存在しない場合は作成
+        if (!fs.existsSync(inputReadyPath)) {
+            fs.mkdirSync(inputReadyPath, { recursive: true });
+        }
+        
         if (file.fieldname === 'jsonFile') {
-            cb(null, 'input/ready/');
+            cb(null, inputReadyPath);
         } else if (file.fieldname === 'pdfFile') {
-            cb(null, 'input/ready/');
+            cb(null, inputReadyPath);
         } else {
-            cb(null, 'input/ready/');
+            cb(null, inputReadyPath);
         }
     },
     filename: function (req, file, cb) {
@@ -1888,12 +1895,38 @@ app.post('/execute', upload.fields([
         
         // ブラウザの起動（タイムアウト設定あり）
         try {
-            browser = await puppeteer.launch({
+            // Windows対応のPuppeteer設定
+            const puppeteerOptions = {
                 headless: false,
                 defaultViewport: null,
-                args: ['--start-maximized', '--no-sandbox', '--disable-setuid-sandbox'],
-                timeout: 30000
-            });
+                timeout: 30000,
+                args: [
+                    '--start-maximized',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+            };
+
+            // Windows環境でのブラウザパス設定
+            if (process.platform === 'win32') {
+                const possiblePaths = [
+                    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+                    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+                ];
+                
+                for (const browserPath of possiblePaths) {
+                    if (fs.existsSync(browserPath)) {
+                        puppeteerOptions.executablePath = browserPath;
+                        break;
+                    }
+                }
+            }
+
+            browser = await puppeteer.launch(puppeteerOptions);
             sendLog('ブラウザの起動が完了しました', 'success');
         } catch (launchError) {
             sendLog(`ブラウザ起動エラー: ${launchError.message}`, 'error');

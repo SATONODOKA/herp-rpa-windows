@@ -27,25 +27,50 @@ class AutoCleanup {
     }
 
     /**
+     * Windows対応：ファイル削除のリトライ機構
+     */
+    async deleteFileWithRetry(filePath, maxRetries = 3, delay = 1000) {
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                fs.unlinkSync(filePath);
+                return true;
+            } catch (error) {
+                if (error.code === 'EBUSY' || error.code === 'ENOENT') {
+                    if (i === maxRetries - 1) {
+                        console.warn(`[CLEANUP] Failed to delete after ${maxRetries} attempts: ${filePath}`);
+                        return false;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+                throw error;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 一時ファイルのクリーンアップ（24時間後）
      */
-    cleanupTempFiles() {
+    async cleanupTempFiles() {
         const tempPath = path.join(__dirname, '../../', this.folders.output.temp);
         if (!fs.existsSync(tempPath)) return;
 
         const files = fs.readdirSync(tempPath);
         let deletedCount = 0;
 
-        files.forEach(file => {
+        for (const file of files) {
             const filePath = path.join(tempPath, file);
             const age = this.getFileAge(filePath);
             
             if (age.hours > this.config.output.temp.hours) {
-                fs.unlinkSync(filePath);
-                deletedCount++;
-                console.log(`[CLEANUP] Deleted temp file: ${file} (${age.hours.toFixed(1)} hours old)`);
+                const success = await this.deleteFileWithRetry(filePath);
+                if (success) {
+                    deletedCount++;
+                    console.log(`[CLEANUP] Deleted temp file: ${file} (${age.hours.toFixed(1)} hours old)`);
+                }
             }
-        });
+        }
 
         if (deletedCount > 0) {
             console.log(`[CLEANUP] Removed ${deletedCount} temporary files`);
@@ -55,23 +80,25 @@ class AutoCleanup {
     /**
      * 失敗ファイルのクリーンアップ（7日後）
      */
-    cleanupFailedFiles() {
+    async cleanupFailedFiles() {
         const failedPath = path.join(__dirname, '../../', this.folders.output.failed);
         if (!fs.existsSync(failedPath)) return;
 
         const files = fs.readdirSync(failedPath);
         let deletedCount = 0;
 
-        files.forEach(file => {
+        for (const file of files) {
             const filePath = path.join(failedPath, file);
             const age = this.getFileAge(filePath);
             
             if (age.days > this.config.output.failed.days) {
-                fs.unlinkSync(filePath);
-                deletedCount++;
-                console.log(`[CLEANUP] Deleted failed file: ${file} (${age.days.toFixed(1)} days old)`);
+                const success = await this.deleteFileWithRetry(filePath);
+                if (success) {
+                    deletedCount++;
+                    console.log(`[CLEANUP] Deleted failed file: ${file} (${age.days.toFixed(1)} days old)`);
+                }
             }
-        });
+        }
 
         if (deletedCount > 0) {
             console.log(`[CLEANUP] Removed ${deletedCount} failed processing files`);
@@ -154,13 +181,13 @@ class AutoCleanup {
     /**
      * すべてのクリーンアップを実行
      */
-    runAll() {
+    async runAll() {
         console.log('=== Starting Auto Cleanup ===');
         console.log(`Time: ${new Date().toISOString()}`);
         
         try {
-            this.cleanupTempFiles();
-            this.cleanupFailedFiles();
+            await this.cleanupTempFiles();
+            await this.cleanupFailedFiles();
             this.archiveSuccessFiles();
             this.archiveProcessLogs();
             console.log('=== Cleanup Completed Successfully ===');
@@ -181,10 +208,10 @@ class AutoCleanup {
         
         const msUntilTomorrow = tomorrow - now;
         
-        setTimeout(() => {
-            this.runAll();
+        setTimeout(async () => {
+            await this.runAll();
             // 次の実行を24時間後にスケジュール
-            setInterval(() => this.runAll(), 24 * 60 * 60 * 1000);
+            setInterval(async () => await this.runAll(), 24 * 60 * 60 * 1000);
         }, msUntilTomorrow);
         
         console.log(`[SCHEDULER] Auto cleanup scheduled for ${tomorrow.toISOString()}`);
@@ -201,7 +228,7 @@ if (require.main === module) {
     if (args.includes('--schedule')) {
         cleanup.scheduleDaily();
     } else {
-        cleanup.runAll();
+        cleanup.runAll().catch(console.error);
     }
 }
 
