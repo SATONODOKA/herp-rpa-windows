@@ -1596,10 +1596,21 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
 
         // 必須項目のマッピング失敗チェック
         if (mappingResult.unmappedFields.length > 0) {
+            sendLog(`🔍 マッピング失敗項目チェック: ${mappingResult.unmappedFields.length}個`, 'info');
+            mappingResult.unmappedFields.forEach((field, index) => {
+                sendLog(`🔍 失敗項目${index + 1}: ${JSON.stringify(field)}`, 'info');
+            });
+            
             const unmappedRequiredFields = mappingResult.unmappedFields.filter(field => 
-                field.fieldName && typeof field.fieldName === 'string'
+                field && field.fieldName && typeof field.fieldName === 'string'
             );
             
+            sendLog(`🔍 フィルタ後必須項目: ${unmappedRequiredFields.length}個`, 'info');
+            unmappedRequiredFields.forEach((field, index) => {
+                sendLog(`🔍 必須項目${index + 1}: ${field.fieldName}`, 'info');
+            });
+            
+            // 🚨 1つでもマッピング失敗項目があれば処理を停止
             if (unmappedRequiredFields.length > 0) {
                 sendLog(`🚨 必須項目のマッピングに失敗しました: ${unmappedRequiredFields.map(f => f.fieldName).join(', ')}`, 'error');
                 return {
@@ -1611,6 +1622,19 @@ async function mapPdfDataToRequiredFields(formAnalysisResult, pdfResult, extract
                     criticalError: true
                 };
             }
+        }
+
+        // 🚨 最終チェック: unmappedFieldsがある場合はsuccess: falseを返す
+        if (mappingResult.unmappedFields && mappingResult.unmappedFields.length > 0) {
+            sendLog(`🚨 最終チェック: ${mappingResult.unmappedFields.length}個のマッピング失敗項目を検出`, 'error');
+            return {
+                success: false,
+                error: `必須項目のマッピングに失敗: ${mappingResult.unmappedFields.map(f => f.fieldName).join(', ')}`,
+                mappedFields: mappingResult.mappedFields,
+                mappings: mappingResult.mappings,
+                unmappedFields: mappingResult.unmappedFields,
+                criticalError: true
+            };
         }
 
         return mappingResult;
@@ -2051,6 +2075,47 @@ app.post('/execute', upload.fields([
                     extractionResult
                 );
                 
+                // 🔍 マッピング結果の詳細デバッグ
+                sendLog(`🔍 マッピング結果: success=${mappingResult.success}, criticalError=${mappingResult.criticalError}`, 'info');
+                sendLog(`🔍 マッピング結果詳細: ${JSON.stringify({
+                    success: mappingResult.success,
+                    mappedFields: mappingResult.mappedFields,
+                    unmappedFieldsCount: mappingResult.unmappedFields?.length || 0,
+                    criticalError: mappingResult.criticalError,
+                    error: mappingResult.error
+                })}`, 'info');
+                
+                // 🚨 マッピング失敗の場合は即座に停止
+                if (!mappingResult.success) {
+                    sendLog('🚨 マッピング失敗により処理を停止します', 'error');
+                    const result = {
+                        inputJobName,
+                        extractionDetails: extractionResult,
+                        jobMatching: matchResult,
+                        matchedJob: matchResult.matchedJob,
+                        matchType: matchResult.matchType,
+                        formAnalysis: formAnalysisResult,
+                        mappingResult: mappingResult,
+                        success: false,
+                        error: mappingResult.error,
+                        criticalError: true,
+                        errorType: 'required_field_mapping_failed',
+                        errorMessage: mappingResult.error,
+                        stopReason: '必須項目マッピング失敗'
+                    };
+                    
+                    sendEvent({ type: 'result', result });
+                    sendLog('🚨 必須項目マッピング失敗により処理を停止します', 'error');
+                    sendEvent({ type: 'complete' });
+                    
+                    res.json({ 
+                        message: '必須項目マッピングに失敗しました',
+                        result 
+                    });
+                    await browser.close();
+                    return;
+                }
+                
                 if (mappingResult.success) {
                     sendLog(`データマッピング完了: ${mappingResult.mappedFields}個の項目をマッピング`, 'success');
                     
@@ -2091,7 +2156,10 @@ app.post('/execute', upload.fields([
                         sendLog('🚨 必須項目マッピング失敗により処理を停止します', 'error');
                         sendEvent({ type: 'complete' });
                         
-                        res.json(result);
+                        res.json({ 
+                            message: '必須項目マッピングに失敗しました',
+                            result 
+                        });
                         await browser.close();
                         return;
                     }
@@ -2164,7 +2232,10 @@ app.post('/execute', upload.fields([
                         sendLog('🚨 必須項目マッピング失敗により処理を停止します', 'error');
                         sendEvent({ type: 'complete' });
                         
-                        res.json(result);
+                        res.json({ 
+                            message: '必須項目マッピングに失敗しました',
+                            result 
+                        });
                         await browser.close();
                         return;
                     }
