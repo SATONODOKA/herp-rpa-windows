@@ -6,6 +6,28 @@ const path = require('path');
 const fs = require('fs');
 const { SimplePDFExtractor } = require('./src/extractors/simple-pdf-extractor');
 
+// .env ファイルの読み込み（セキュア環境対応）
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+        const [key, value] = line.split('=');
+        if (key && value) {
+            process.env[key.trim()] = value.trim();
+        }
+    });
+    console.log('📄 .env ファイルを読み込みました');
+}
+
+// セキュア環境モード設定
+const SECURE_MODE = process.env.HERP_SECURE_MODE === 'true';
+const OFFLINE_MODE = process.env.HERP_OFFLINE_MODE === 'true';
+
+if (SECURE_MODE) {
+    console.log('🔒 セキュア環境モードで起動しています');
+    console.log('🌐 オフラインモード:', OFFLINE_MODE ? 'ON' : 'OFF');
+}
+
 const app = express();
 const port = 3001;
 
@@ -1911,18 +1933,39 @@ app.post('/execute', upload.fields([
 
             // Windows環境でのブラウザパス設定
             if (process.platform === 'win32') {
-                const possiblePaths = [
-                    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-                    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-                    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-                    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
-                ];
+                let possiblePaths = [];
+                
+                if (SECURE_MODE) {
+                    // セキュア環境：Portable Chromium を優先
+                    possiblePaths = [
+                        path.join(__dirname, 'runtime', 'chromium', 'chrome.exe'),
+                        path.join(__dirname, 'runtime', 'chrome', 'chrome.exe'),
+                        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+                        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+                    ];
+                } else {
+                    // 通常環境：システムブラウザを優先
+                    possiblePaths = [
+                        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+                        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+                    ];
+                }
                 
                 for (const browserPath of possiblePaths) {
                     if (fs.existsSync(browserPath)) {
                         puppeteerOptions.executablePath = browserPath;
+                        console.log(`🌐 ブラウザパス: ${browserPath}`);
                         break;
                     }
+                }
+                
+                if (!puppeteerOptions.executablePath && SECURE_MODE) {
+                    console.warn('⚠️  Portable ブラウザが見つかりません');
+                    console.warn('   setup_portable.bat でセットアップを完了してください');
                 }
             }
 
